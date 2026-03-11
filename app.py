@@ -20,6 +20,7 @@ with open(BASE_DIR / "feeds.json") as f:
 # ── Simple in-memory cache (30 min TTL) ───────────────────────────────────────
 _cache: dict = {}
 _cache_lock = threading.Lock()
+_fetch_lock = threading.Lock()   # ensures only one feed-fetch runs at a time
 CACHE_TTL = 1800
 
 
@@ -145,18 +146,24 @@ def fetch_all() -> list[dict]:
     if cached is not None:
         return cached
 
-    now = datetime.utcnow()
-    results = []
+    # Only one fetch at a time — any concurrent caller waits then hits cache
+    with _fetch_lock:
+        cached = _get_cache("items")   # re-check after acquiring lock
+        if cached is not None:
+            return cached
 
-    # Fetch all feeds in parallel — max 22 workers, one per feed
-    with ThreadPoolExecutor(max_workers=len(FEED_CONFIG)) as pool:
-        futures = {pool.submit(_fetch_one, cfg, now): cfg for cfg in FEED_CONFIG}
-        for future in as_completed(futures):
-            results.extend(future.result())
+        now = datetime.utcnow()
+        results = []
 
-    results.sort(key=lambda x: x["published_ts"], reverse=True)
-    _set_cache("items", results)
-    return results
+        # Fetch all feeds in parallel — cap at 10 workers for free-tier stability
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            futures = {pool.submit(_fetch_one, cfg, now): cfg for cfg in FEED_CONFIG}
+            for future in as_completed(futures):
+                results.extend(future.result())
+
+        results.sort(key=lambda x: x["published_ts"], reverse=True)
+        _set_cache("items", results)
+        return results
 
 
 # ── Background cache warm-up on startup ───────────────────────────────────────
