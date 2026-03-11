@@ -501,19 +501,27 @@ async function loadItems(forceRefresh = false) {
   $("errorState").style.display = "none";
 
   try {
-    let data;
+    // 90s timeout — first load fetches 22 feeds in parallel, give it time
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 90000);
+
     if (forceRefresh) {
-      await fetch("/api/refresh", { method: "POST" });
+      await fetch("/api/refresh", { method: "POST", signal: controller.signal });
     }
-    const resp = await fetch("/api/items");
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    data = await resp.json();
+    const resp = await fetch("/api/items", { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (!resp.ok) throw new Error(`Server returned HTTP ${resp.status}`);
+    const data = await resp.json();
     $("srcCount").textContent = data.sources || "—";
     processData(data);
   } catch (e) {
     $("loading").style.display = "none";
     $("errorState").style.display = "";
-    $("errorMsg").textContent = `Error: ${e.message}`;
+    const msg = e.name === "AbortError"
+      ? "Request timed out — the server may still be waking up. Try refreshing in a moment."
+      : `Error: ${e.message}`;
+    $("errorMsg").textContent = msg;
   }
 }
 
