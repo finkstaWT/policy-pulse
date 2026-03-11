@@ -1,0 +1,134 @@
+[
+  {
+    "name": "Pew Research Center",
+    "url": "https://www.pewresearch.org/feed/",
+    "type": "Research",
+    "color": "#1a3a5c"
+  },
+  {
+    "name": "U.S. Chamber of Commerce",
+    "url": "https://www.uschamber.com/rss.xml",
+    "type": "Trade Org",
+    "color": "#1b3a6b"
+  },
+  {
+    "name": "AEI",
+    "url": "https://www.aei.org/feed/",
+    "type": "Think Tank",
+    "color": "#7b2d2d"
+  },
+  {
+    "name": "Tax Foundation",
+    "url": "https://taxfoundation.org/feed/",
+    "type": "Think Tank",
+    "color": "#1a5276"
+  },
+  {
+    "name": "Reason",
+    "url": "https://reason.com/feed/",
+    "type": "Think Tank",
+    "color": "#c0392b"
+  },
+  {
+    "name": "Economic Policy Institute",
+    "url": "https://www.epi.org/feed/",
+    "type": "Think Tank",
+    "color": "#6c3483"
+  },
+  {
+    "name": "Bipartisan Policy Center",
+    "url": "https://bipartisanpolicy.org/feed/",
+    "type": "Think Tank",
+    "color": "#784212"
+  },
+  {
+    "name": "Heritage / Daily Signal",
+    "url": "https://feeds.feedburner.com/DailySignal",
+    "type": "Think Tank",
+    "color": "#922b21"
+  },
+  {
+    "name": "Roosevelt Institute",
+    "url": "https://rooseveltinstitute.org/feed/",
+    "type": "Think Tank",
+    "color": "#1a6b3c"
+  },
+  {
+    "name": "Aspen Institute",
+    "url": "https://www.aspeninstitute.org/feed/",
+    "type": "Think Tank",
+    "color": "#2e4057"
+  },
+  {
+    "name": "New America",
+    "url": "https://www.newamerica.org/feed/",
+    "type": "Think Tank",
+    "color": "#0e6b8c"
+  },
+  {
+    "name": "Stimson Center",
+    "url": "https://www.stimson.org/feed/",
+    "type": "Think Tank",
+    "color": "#4a235a"
+  },
+  {
+    "name": "ACLU",
+    "url": "https://www.aclu.org/press-releases/rss",
+    "type": "Advocacy",
+    "color": "#2471a3"
+  },
+  {
+    "name": "Public Citizen",
+    "url": "https://www.citizen.org/feed/",
+    "type": "Advocacy",
+    "color": "#196f3d"
+  },
+  {
+    "name": "Everytown Research",
+    "url": "https://everytownresearch.org/feed/",
+    "type": "Advocacy",
+    "color": "#17202a"
+  },
+  {
+    "name": "Nat'l Consumers League",
+    "url": "https://nclnet.org/feed/",
+    "type": "Advocacy",
+    "color": "#e67e22"
+  },
+  {
+    "name": "Sierra Club",
+    "url": "https://www.sierraclub.org/rss.xml",
+    "type": "Advocacy",
+    "color": "#27ae60"
+  },
+  {
+    "name": "NAM",
+    "url": "https://www.nam.org/feed/",
+    "type": "Trade Org",
+    "color": "#1f618d"
+  },
+  {
+    "name": "NFIB",
+    "url": "https://www.nfib.com/feed/",
+    "type": "Trade Org",
+    "color": "#c0392b"
+  },
+  {
+    "name": "Nat'l League of Cities",
+    "url": "https://www.nlc.org/feed/",
+    "type": "Trade Org",
+    "color": "#28623c"
+  },
+  {
+    "name": "GovExec",
+    "url": "https://www.govexec.com/rss/all/",
+    "type": "Media",
+    "color": "#2c3e50"
+  },
+  {
+    "name": "Roll Call",
+    "url": "https://rollcall.com/feed/",
+    "type": "Media",
+    "color": "#7d6608"
+  }
+]

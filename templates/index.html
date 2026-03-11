@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PolicyPulse — Political & Trade News Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #f1f5f9;
+      --card:      #ffffff;
+      --border:    #e2e8f0;
+      --text:      #1e293b;
+      --muted:     #64748b;
+      --subtle:    #94a3b8;
+      --header:    #0f172a;
+      --blue:      #3b82f6;
+      --red:       #ef4444;
+      --green:     #22c55e;
+      --amber:     #f59e0b;
+      --purple:    #8b5cf6;
+      --radius:    10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    .header {
+      background: var(--header);
+      color: #fff;
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      box-shadow: 0 2px 12px rgba(0,0,0,.4);
+    }
+
+    .logo {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      white-space: nowrap;
+    }
+    .logo span { color: #60a5fa; }
+
+    .search-wrap {
+      flex: 1;
+      max-width: 420px;
+      position: relative;
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: rgba(255,255,255,.4);
+      pointer-events: none;
+      font-size: .85rem;
+    }
+    .search-input {
+      width: 100%;
+      padding: 7px 12px 7px 30px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 8px;
+      color: #fff;
+      font-size: .85rem;
+      outline: none;
+      transition: background .15s, border-color .15s;
+    }
+    .search-input::placeholder { color: rgba(255,255,255,.4); }
+    .search-input:focus {
+      background: rgba(255,255,255,.15);
+      border-color: rgba(255,255,255,.35);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+    .last-updated {
+      font-size: .72rem;
+      color: rgba(255,255,255,.5);
+      white-space: nowrap;
+    }
+
+    .btn {
+      padding: 6px 14px;
+      border-radius: 7px;
+      border: none;
+      cursor: pointer;
+      font-size: .8rem;
+      font-weight: 600;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { background: #60a5fa; color: #0f172a; }
+    .btn-primary:not(:disabled):hover { background: #93c5fd; }
+    .btn-ghost {
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,.18); }
+
+    /* ── Toolbar ─────────────────────────────────────────── */
+    .toolbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .filter-label {
+      font-size: .68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: var(--subtle);
+      margin-right: 2px;
+    }
+
+    .pill {
+      padding: 4px 11px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: .76rem;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all .15s;
+      line-height: 1;
+    }
+    .pill:hover { border-color: #94a3b8; color: var(--text); }
+    .pill.on  { border-color: transparent; color: #fff; }
+    .pill.on.tag-breaking  { background: var(--red); }
+    .pill.on.tag-newsy     { background: var(--blue); }
+    .pill.on.tag-evergreen { background: var(--green); }
+    .pill.on.tag-type      { background: var(--purple); }
+    .pill.on.tag-bookmark  { background: var(--amber); color: #1e293b; }
+
+    .divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+    .toolbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    .item-count { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+
+    .view-toggle button {
+      background: none;
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: .8rem;
+      color: var(--muted);
+      transition: all .15s;
+    }
+    .view-toggle button:first-child { border-radius: 6px 0 0 6px; }
+    .view-toggle button:last-child  { border-radius: 0 6px 6px 0; border-left: none; }
+    .view-toggle button.on { background: var(--text); color: #fff; border-color: var(--text); }
+
+    /* ── Main ────────────────────────────────────────────── */
+    .main { max-width: 1440px; margin: 0 auto; padding: 20px 24px 40px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 14px;
+    }
+    .grid.compact {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    /* ── Cards ───────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 15px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      transition: box-shadow .18s, border-color .18s;
+      position: relative;
+    }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); border-color: #cbd5e1; }
+    .card.bookmarked { border-left: 3px solid var(--amber); }
+
+    /* compact row variant */
+    .grid.compact .card {
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+      border-top: none;
+      padding: 12px 20px;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .grid.compact .card:first-child { border-top: 1px solid var(--border); border-radius: 8px 8px 0 0; }
+    .grid.compact .card:last-child  { border-radius: 0 0 8px 8px; }
+    .grid.compact .card.bookmarked  { border-left: 3px solid var(--amber); }
+
+    .card-meta {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-badges { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: .67rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      white-space: nowrap;
+    }
+    .badge-org   { color: #fff; }
+    .badge-type  { background: #f1f5f9; color: #475569; }
+    .badge-date  { background: #f8fafc; color: var(--subtle); font-weight: 500; }
+    .badge-breaking  { background: #fee2e2; color: #b91c1c; }
+    .badge-newsy     { background: #dbeafe; color: #1d4ed8; }
+    .badge-evergreen { background: #dcfce7; color: #15803d; }
+
+    .card-actions {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 3px 4px;
+      border-radius: 5px;
+      opacity: .45;
+      transition: opacity .15s, background .15s;
+    }
+    .icon-btn:hover { opacity: 1; background: #f1f5f9; }
+    .icon-btn.active { opacity: 1; }
+
+    .card-title {
+      font-size: .93rem;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+    .card-title a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .card-title a:hover { color: var(--blue); text-decoration: underline; }
+
+    .card-summary {
+      font-size: .81rem;
+      color: #475569;
+      line-height: 1.55;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+    .card-date { font-size: .73rem; color: var(--subtle); }
+    .card-link {
+      font-size: .76rem;
+      font-weight: 600;
+      color: var(--blue);
+      text-decoration: none;
+      margin-left: auto;
+    }
+    .card-link:hover { text-decoration: underline; }
+
+    .copy-btn {
+      padding: 4px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-size: .72rem;
+      cursor: pointer;
+      color: var(--muted);
+      font-weight: 500;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .copy-btn:hover { background: #e2e8f0; color: var(--text); }
+    .copy-btn.copied { background: #dcfce7; color: #15803d; border-color: #86efac; }
+
+    /* compact card adjustments */
+    .grid.compact .card-compact-left  { flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; min-width: 130px; max-width: 140px; }
+    .grid.compact .card-compact-right { flex: 1; min-width: 0; }
+    .grid.compact .card-footer { padding-top: 6px; }
+    .grid.compact .card-summary { display: none; }
+
+    /* ── States ──────────────────────────────────────────── */
+    .state-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 20px;
+      color: var(--muted);
+      gap: 12px;
+      text-align: center;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-icon { font-size: 2.5rem; }
+    .state-msg { font-size: .9rem; }
+    .state-sub { font-size: .8rem; color: var(--subtle); max-width: 380px; }
+
+    /* ── Toast ───────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e293b;
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: .83rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,.3);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+      z-index: 500;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 680px) {
+      .header { padding: 0 14px; gap: 10px; }
+      .search-wrap { max-width: 180px; }
+      .toolbar { padding: 8px 14px; gap: 10px; }
+      .main { padding: 14px 14px 40px; }
+      .grid { grid-template-columns: 1fr; }
+      .last-updated, .btn-ghost { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="logo">Policy<span>Pulse</span></div>
+
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input id="searchInput" class="search-input"
+           type="search" placeholder="Search headlines, orgs…" autocomplete="off">
+  </div>
+
+  <div class="header-right">
+    <span class="last-updated" id="lastUpdated">Loading…</span>
+    <button class="btn btn-ghost" onclick="exportVisible()">⬇ Export</button>
+    <button class="btn btn-primary" id="refreshBtn" onclick="doRefresh()">↻ Refresh</button>
+  </div>
+</header>
+
+<!-- ── Toolbar ─────────────────────────────────────────────────── -->
+<div class="toolbar">
+  <!-- Tag filters -->
+  <div class="filter-group">
+    <span class="filter-label">Show</span>
+    <button class="pill on tag-breaking" data-tag="breaking"  onclick="toggleTag(this)">🔴 Breaking</button>
+    <button class="pill on tag-newsy"    data-tag="newsy"     onclick="toggleTag(this)">🔵 Newsy</button>
+    <button class="pill on tag-evergreen"data-tag="evergreen" onclick="toggleTag(this)">🟢 Evergreen</button>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Org type filters (built dynamically) -->
+  <div class="filter-group" id="orgTypeGroup">
+    <span class="filter-label">Org</span>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Bookmark filter -->
+  <div class="filter-group">
+    <button class="pill tag-bookmark" id="bookmarkPill" onclick="toggleBookmarksOnly()">⭐ Saved</button>
+  </div>
+
+  <!-- Right side -->
+  <div class="toolbar-right">
+    <span class="item-count" id="itemCount"></span>
+    <div class="view-toggle">
+      <button id="gridViewBtn"    class="on" onclick="setView('grid')"    title="Grid view">⊞</button>
+      <button id="compactViewBtn"          onclick="setView('compact')" title="Compact view">≡</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main ────────────────────────────────────────────────────── -->
+<main class="main">
+  <div id="loading" class="state-center">
+    <div class="spinner"></div>
+    <p class="state-msg">Fetching the latest from <strong id="srcCount">—</strong> sources…</p>
+  </div>
+
+  <div id="grid" class="grid" style="display:none"></div>
+
+  <div id="emptyState" class="state-center" style="display:none">
+    <span class="error-icon">🔍</span>
+    <p class="state-msg">No items match your filters.</p>
+    <p class="state-sub">Try adjusting the tag or org filters, or clearing your search.</p>
+  </div>
+
+  <div id="errorState" class="state-center" style="display:none">
+    <span class="error-icon">⚠️</span>
+    <p class="state-msg" id="errorMsg">Could not load feeds.</p>
+    <p class="state-sub">Make sure the server is running on port 5050 and <code>feedparser</code> is installed.</p>
+  </div>
+</main>
+
+<!-- ── Toast ────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let allItems     = [];
+let orgTypes     = [];
+let activeTags   = new Set(["breaking", "newsy", "evergreen"]);
+let activeTypes  = new Set();
+let bookmarksOnly = false;
+let searchQ      = "";
+let currentView  = "grid";
+let bookmarks    = new Set(JSON.parse(localStorage.getItem("pp_bm") || "[]"));
+
+// ── Helpers ────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function showToast(msg, ms = 2200) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), ms);
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function relDate(d) {
+  if (d === 0) return "Today";
+  if (d === 1) return "Yesterday";
+  if (d < 7)  return `${d}d ago`;
+  if (d < 30) return `${Math.floor(d/7)}w ago`;
+  return `${Math.floor(d/30)}mo ago`;
+}
+
+// ── Load / Refresh ─────────────────────────────────────────────────
+async function loadItems(forceRefresh = false) {
+  $("loading").style.display = "";
+  $("grid").style.display = "none";
+  $("emptyState").style.display = "none";
+  $("errorState").style.display = "none";
+
+  try {
+    let data;
+    if (forceRefresh) {
+      await fetch("/api/refresh", { method: "POST" });
+    }
+    const resp = await fetch("/api/items");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    data = await resp.json();
+    $("srcCount").textContent = data.sources || "—";
+    processData(data);
+  } catch (e) {
+    $("loading").style.display = "none";
+    $("errorState").style.display = "";
+    $("errorMsg").textContent = `Error: ${e.message}`;
+  }
+}
+
+function processData(data) {
+  allItems = data.items || [];
+  orgTypes = data.org_types || [];
+  activeTypes = new Set(orgTypes);
+
+  $("lastUpdated").textContent = "Updated " + (data.fetched_at || "—");
+  $("loading").style.display = "none";
+
+  buildOrgFilters();
+  render();
+}
+
+async function doRefresh() {
+  const btn = $("refreshBtn");
+  btn.disabled = true;
+  btn.textContent = "↺ Refreshing…";
+  await loadItems(true);
+  btn.disabled = false;
+  btn.textContent = "↻ Refresh";
+  showToast("✓ Feeds refreshed!");
+}
+
+// ── Filters ────────────────────────────────────────────────────────
+function buildOrgFilters() {
+  const group = $("orgTypeGroup");
+  // remove old pills (keep the label)
+  group.querySelectorAll(".pill").forEach(p => p.remove());
+
+  orgTypes.forEach(t => {
+    const btn = document.createElement("button");
+    btn.className = "pill on tag-type";
+    btn.dataset.orgType = t;
+    btn.textContent = t;
+    btn.onclick = () => toggleOrgType(btn, t);
+    group.appendChild(btn);
+  });
+}
+
+function toggleTag(btn) {
+  const tag = btn.dataset.tag;
+  if (activeTags.has(tag)) { activeTags.delete(tag); btn.classList.remove("on"); }
+  else                      { activeTags.add(tag);    btn.classList.add("on"); }
+  render();
+}
+
+function toggleOrgType(btn, type) {
+  if (activeTypes.has(type)) { activeTypes.delete(type); btn.classList.remove("on"); }
+  else                        { activeTypes.add(type);    btn.classList.add("on"); }
+  render();
+}
+
+function toggleBookmarksOnly() {
+  bookmarksOnly = !bookmarksOnly;
+  const pill = $("bookmarkPill");
+  bookmarksOnly ? pill.classList.add("on") : pill.classList.remove("on");
+  render();
+}
+
+function setView(v) {
+  currentView = v;
+  const grid = $("grid");
+  grid.className = v === "compact" ? "grid compact" : "grid";
+  $("gridViewBtn").className    = v === "grid"    ? "on" : "";
+  $("compactViewBtn").className = v === "compact" ? "on" : "";
+  render();
+}
+
+$("searchInput").addEventListener("input", e => {
+  searchQ = e.target.value.trim().toLowerCase();
+  render();
+});
+
+// ── Render ─────────────────────────────────────────────────────────
+function filtered() {
+  return allItems.filter(item => {
+    if (!activeTags.has(item.tag))              return false;
+    if (!activeTypes.has(item.org_type))        return false;
+    if (bookmarksOnly && !bookmarks.has(item.id)) return false;
+    if (searchQ) {
+      return item.title.toLowerCase().includes(searchQ)
+          || (item.summary || "").toLowerCase().includes(searchQ)
+          || item.org.toLowerCase().includes(searchQ);
+    }
+    return true;
+  });
+}
+
+function render() {
+  const items = filtered();
+  $("itemCount").textContent = `${items.length} of ${allItems.length} items`;
+
+  if (items.length === 0) {
+    $("grid").style.display = "none";
+    $("emptyState").style.display = "";
+    return;
+  }
+  $("emptyState").style.display = "none";
+  $("grid").style.display = "";
+
+  const isCompact = currentView === "compact";
+  $("grid").innerHTML = items.map(item => cardHTML(item, isCompact)).join("");
+}
+
+function cardHTML(item, compact) {
+  const bm = bookmarks.has(item.id);
+  const tagLabel = { breaking: "🔴 Breaking", newsy: "🔵 Newsy", evergreen: "🟢 Evergreen" };
+  const badges = `
+    <span class="badge badge-org" style="background:${esc(item.org_color)}">${esc(item.org)}</span>
+    <span class="badge badge-type">${esc(item.org_type)}</span>
+    <span class="badge badge-${esc(item.tag)}">${tagLabel[item.tag] || item.tag}</span>
+    <span class="badge badge-date">${relDate(item.days_old)}</span>
+  `;
+  const actions = `
+    <button class="icon-btn${bm?" active":""}" title="${bm?"Remove bookmark":"Bookmark"}"
+            onclick="toggleBM('${esc(item.id)}')">⭐</button>
+    <button class="copy-btn" onclick="copyItem(this,'${esc(item.id)}')">Copy</button>
+  `;
+  const titleEl = `<div class="card-title"><a href="${esc(item.link)}" target="_blank" rel="noopener">${esc(item.title)}</a></div>`;
+  const footer  = `
+    <div class="card-footer">
+      <span class="card-date">${esc(item.published)}</span>
+      <a class="card-link" href="${esc(item.link)}" target="_blank" rel="noopener">Read full story →</a>
+    </div>
+  `;
+
+  if (compact) {
+    return `
+      <article class="card${bm?" bookmarked":""}" id="c-${esc(item.id)}">
+        <div class="card-compact-left">
+          <div class="card-badges">${badges}</div>
+        </div>
+        <div class="card-compact-right">
+          <div class="card-meta" style="margin-bottom:5px">
+            ${titleEl}
+            <div class="card-actions">${actions}</div>
+          </div>
+          ${footer}
+        </div>
+      </article>`;
+  }
+
+  return `
+    <article class="card${bm?" bookmarked":""}" id="c-${esc(item.id)}">
+      <div class="card-meta">
+        <div class="card-badges">${badges}</div>
+        <div class="card-actions">${actions}</div>
+      </div>
+      ${titleEl}
+      ${item.summary ? `<p class="card-summary">${esc(item.summary)}</p>` : ""}
+      ${footer}
+    </article>`;
+}
+
+// ── Bookmarks ──────────────────────────────────────────────────────
+function toggleBM(id) {
+  if (bookmarks.has(id)) { bookmarks.delete(id); showToast("Bookmark removed"); }
+  else                   { bookmarks.add(id);    showToast("⭐ Saved!"); }
+  localStorage.setItem("pp_bm", JSON.stringify([...bookmarks]));
+  render();
+}
+
+// ── Copy single item ───────────────────────────────────────────────
+function copyItem(btn, id) {
+  const item = allItems.find(i => i.id === id);
+  if (!item) return;
+  const text = [
+    item.title,
+    `${item.org} (${item.org_type}) — ${item.published}`,
+    item.link,
+    item.summary ? `\n${item.summary}` : "",
+  ].filter(Boolean).join("\n");
+
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = "✓ Copied";
+    btn.classList.add("copied");
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 2000);
+  });
+}
+
+// ── Export visible ─────────────────────────────────────────────────
+function exportVisible() {
+  const items = filtered();
+  if (!items.length) { showToast("No items to export."); return; }
+
+  const sep = "─".repeat(62);
+  const header = `PolicyPulse Export — ${new Date().toLocaleDateString("en-US",{dateStyle:"long"})}
+${items.length} items | ${sep}`;
+
+  const body = items.map(i => [
+    `${i.title}`,
+    `${i.org} (${i.org_type}) | ${i.published} | ${i.tag.toUpperCase()}`,
+    i.link,
+    i.summary || "",
+    sep,
+  ].filter(Boolean).join("\n")).join("\n\n");
+
+  navigator.clipboard.writeText(`${header}\n\n${body}`).then(() => {
+    showToast(`📋 Copied ${items.length} items to clipboard!`, 3000);
+  });
+}
+
+// ── Init ───────────────────────────────────────────────────────────
+loadItems();
+</script>
+</body>
+</html>
