@@ -5,7 +5,8 @@ import time
 import hashlib
 import warnings
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
+from email.utils import parsedate_to_datetime as _rfc2822
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, jsonify
@@ -89,7 +90,8 @@ def _make_id(link: str, title: str) -> str:
     return hashlib.md5(raw).hexdigest()[:12]
 
 
-def _parse_date(entry) -> datetime:
+def _parse_date(entry) -> datetime | None:
+    # 1. feedparser pre-parsed struct_time (already normalised to UTC)
     for field in ("published_parsed", "updated_parsed", "created_parsed"):
         val = getattr(entry, field, None)
         if val:
@@ -97,7 +99,15 @@ def _parse_date(entry) -> datetime:
                 return datetime(*val[:6])
             except Exception:
                 pass
-    return datetime.utcnow()
+    # 2. raw date strings — handles formats feedparser couldn't parse
+    for field in ("published", "updated", "created"):
+        raw = getattr(entry, field, None) or entry.get(field, "")
+        if raw:
+            try:
+                return _rfc2822(raw).replace(tzinfo=None)
+            except Exception:
+                pass
+    return None
 
 
 def _fetch_one(cfg: dict, now: datetime) -> list[dict]:
@@ -116,7 +126,10 @@ def _fetch_one(cfg: dict, now: datetime) -> list[dict]:
         feed = feedparser.parse(resp.content)
         for entry in feed.entries[:20]:
             pub = _parse_date(entry)
-            days_old = max(0, (now - pub).days)
+            if pub is None or pub > now:          # missing or future date
+                pub = now
+            pub = max(pub, now - timedelta(days=730))  # clamp absurdly old dates
+            days_old = (now - pub).days
             title = _strip_html(entry.get("title", "Untitled"))
             link = entry.get("link", "#")
             raw = entry.get("summary") or entry.get("description") or ""

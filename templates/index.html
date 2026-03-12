@@ -349,6 +349,98 @@
     .state-msg { font-size: .9rem; }
     .state-sub { font-size: .8rem; color: var(--subtle); max-width: 380px; }
 
+    /* ── Sources dropdown ────────────────────────────────── */
+    .src-wrap { position: relative; }
+
+    .src-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 11px;
+      border-radius: 999px;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      font-size: .76rem;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .src-btn:hover { border-color: #94a3b8; color: var(--text); }
+    .src-btn.active { border-color: transparent; background: var(--purple); color: #fff; }
+    .src-btn .src-count {
+      background: rgba(0,0,0,.12);
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: .68rem;
+      font-weight: 700;
+    }
+
+    .src-panel {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 300;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.12);
+      width: 270px;
+      max-height: 380px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .src-panel.hidden { display: none !important; }
+
+    .src-panel-head {
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .src-panel-title { font-size: .75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .src-ctrl-btns { display: flex; gap: 6px; }
+    .src-ctrl-btn {
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--blue);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+    .src-ctrl-btn:hover { text-decoration: underline; }
+
+    .src-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+
+    .src-group-label {
+      padding: 6px 12px 3px;
+      font-size: .67rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--subtle);
+    }
+
+    .src-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background .1s;
+      user-select: none;
+    }
+    .src-option:hover { background: #f8fafc; }
+    .src-option input[type=checkbox] { accent-color: var(--purple); cursor: pointer; flex-shrink: 0; }
+    .src-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .src-name { font-size: .8rem; color: var(--text); flex: 1; }
+
     /* ── Toast ───────────────────────────────────────────── */
     #toast {
       position: fixed;
@@ -417,6 +509,27 @@
 
   <div class="divider"></div>
 
+  <!-- Sources dropdown -->
+  <div class="filter-group">
+    <div class="src-wrap" id="srcWrap">
+      <button class="src-btn" id="srcBtn" onclick="toggleSrcPanel(event)">
+        Sources <span class="src-count" id="srcBtnCount">—</span> ▾
+      </button>
+      <div class="src-panel hidden" id="srcPanel">
+        <div class="src-panel-head">
+          <span class="src-panel-title">Filter by source</span>
+          <div class="src-ctrl-btns">
+            <button class="src-ctrl-btn" onclick="selectAllSrc()">All</button>
+            <button class="src-ctrl-btn" onclick="clearAllSrc()">None</button>
+          </div>
+        </div>
+        <div class="src-list" id="srcList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
   <!-- Bookmark filter -->
   <div class="filter-group">
     <button class="pill tag-bookmark" id="bookmarkPill" onclick="toggleBookmarksOnly()">⭐ Saved</button>
@@ -459,14 +572,16 @@
 
 <script>
 // ── State ──────────────────────────────────────────────────────────
-let allItems     = [];
-let orgTypes     = [];
-let activeTags   = new Set(["breaking", "newsy", "evergreen"]);
-let activeTypes  = new Set();
+let allItems      = [];
+let orgTypes      = [];
+let activeTags    = new Set(["breaking", "newsy", "evergreen"]);
+let activeTypes   = new Set();
+let activeSources = new Set();   // individual org names
+let allSources    = [];          // [{name, color, type}, …]
 let bookmarksOnly = false;
-let searchQ      = "";
-let currentView  = "grid";
-let bookmarks    = new Set(JSON.parse(localStorage.getItem("pp_bm") || "[]"));
+let searchQ       = "";
+let currentView   = "grid";
+let bookmarks     = new Set(JSON.parse(localStorage.getItem("pp_bm") || "[]"));
 
 // ── Helpers ────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -530,10 +645,23 @@ function processData(data) {
   orgTypes = data.org_types || [];
   activeTypes = new Set(orgTypes);
 
+  // Build unique source list in stable order (by type, then name)
+  const seen = new Set();
+  allSources = [];
+  [...allItems].sort((a,b) => (a.org_type+a.org).localeCompare(b.org_type+b.org))
+    .forEach(i => {
+      if (!seen.has(i.org)) {
+        seen.add(i.org);
+        allSources.push({ name: i.org, color: i.org_color, type: i.org_type });
+      }
+    });
+  activeSources = new Set(allSources.map(s => s.name));
+
   $("lastUpdated").textContent = "Updated " + (data.fetched_at || "—");
   $("loading").style.display = "none";
 
   buildOrgFilters();
+  buildSourceDropdown();
   render();
 }
 
@@ -600,8 +728,9 @@ $("searchInput").addEventListener("input", e => {
 // ── Render ─────────────────────────────────────────────────────────
 function filtered() {
   return allItems.filter(item => {
-    if (!activeTags.has(item.tag))              return false;
-    if (!activeTypes.has(item.org_type))        return false;
+    if (!activeTags.has(item.tag))                return false;
+    if (!activeTypes.has(item.org_type))          return false;
+    if (!activeSources.has(item.org))             return false;
     if (bookmarksOnly && !bookmarks.has(item.id)) return false;
     if (searchQ) {
       return item.title.toLowerCase().includes(searchQ)
@@ -611,6 +740,71 @@ function filtered() {
     return true;
   });
 }
+
+// ── Sources dropdown ───────────────────────────────────────────────
+function buildSourceDropdown() {
+  const list = $("srcList");
+  // Group by org type
+  const groups = {};
+  allSources.forEach(s => {
+    (groups[s.type] = groups[s.type] || []).push(s);
+  });
+
+  list.innerHTML = Object.keys(groups).sort().map(type => `
+    <div class="src-group-label">${esc(type)}</div>
+    ${groups[type].map(s => `
+      <label class="src-option">
+        <input type="checkbox" checked data-src="${esc(s.name)}"
+               onchange="toggleSrc(this)">
+        <span class="src-dot" style="background:${esc(s.color)}"></span>
+        <span class="src-name">${esc(s.name)}</span>
+      </label>
+    `).join("")}
+  `).join("");
+
+  updateSrcBtn();
+}
+
+function updateSrcBtn() {
+  const total = allSources.length;
+  const active = activeSources.size;
+  const btn = $("srcBtn");
+  $("srcBtnCount").textContent = active === total ? `${total}` : `${active}/${total}`;
+  btn.classList.toggle("active", active < total);
+}
+
+function toggleSrc(cb) {
+  const name = cb.dataset.src;
+  cb.checked ? activeSources.add(name) : activeSources.delete(name);
+  updateSrcBtn();
+  render();
+}
+
+function selectAllSrc() {
+  activeSources = new Set(allSources.map(s => s.name));
+  $("srcList").querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true);
+  updateSrcBtn();
+  render();
+}
+
+function clearAllSrc() {
+  activeSources.clear();
+  $("srcList").querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false);
+  updateSrcBtn();
+  render();
+}
+
+function toggleSrcPanel(e) {
+  e.stopPropagation();
+  $("srcPanel").classList.toggle("hidden");
+}
+
+// Close dropdown when clicking outside
+document.addEventListener("click", e => {
+  if (!$("srcWrap").contains(e.target)) {
+    $("srcPanel").classList.add("hidden");
+  }
+});
 
 function render() {
   const items = filtered();
