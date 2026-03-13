@@ -548,6 +548,27 @@
     .probe-already-note { color: var(--green); font-weight: 600; margin-top: 6px; }
     .no-suggestions { padding: 8px 12px; font-size: .78rem; color: var(--subtle); font-style: italic; }
 
+    /* multi-feed discover results */
+    .probe-multi-header {
+      font-size: .72rem; font-weight: 700; color: var(--subtle);
+      text-transform: uppercase; letter-spacing: .4px;
+      padding: 4px 0 5px;
+    }
+    .probe-multi-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px; background: #f8fafc;
+      border: 1px solid var(--border); border-radius: 6px; margin-bottom: 5px;
+    }
+    .probe-multi-info { flex: 1; min-width: 0; }
+    .probe-multi-item .probe-feed-name {
+      margin-bottom: 1px; font-size: .8rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .probe-quick-add { padding: 4px 10px; font-size: .73rem; white-space: nowrap; }
+    .probe-already-badge {
+      font-size: .72rem; color: var(--green); font-weight: 600; white-space: nowrap;
+    }
+
     /* ── Toast ───────────────────────────────────────────── */
     #toast {
       position: fixed;
@@ -643,10 +664,10 @@
 
         <div class="src-custom-area">
           <div class="src-custom-row">
-            <input type="url" id="customFeedUrl" class="src-custom-input"
-                   placeholder="Or paste any RSS/Atom URL…"
-                   onkeydown="if(event.key==='Enter')testCustomFeed()">
-            <button class="src-test-btn" id="testFeedBtn" onclick="testCustomFeed()">Test</button>
+            <input type="text" id="customFeedUrl" class="src-custom-input"
+                   placeholder="Site URL or domain, e.g. vox.com"
+                   onkeydown="if(event.key==='Enter')discoverFeeds()">
+            <button class="src-test-btn" id="testFeedBtn" onclick="discoverFeeds()">Search</button>
           </div>
           <div id="probeResult" class="probe-result" style="display:none"></div>
         </div>
@@ -1070,47 +1091,75 @@ function removeFeedByUrl(url) {
   showToast(`Removed "${feed.name}"`);
 }
 
-async function testCustomFeed() {
+async function discoverFeeds() {
   const urlInput = $("customFeedUrl");
   const btn = $("testFeedBtn");
-  const url = urlInput.value.trim();
-  if (!url) { showToast("Please enter a URL to test."); return; }
+  const q = urlInput.value.trim();
+  if (!q) { showToast("Enter a site URL or domain to search."); return; }
 
   const result = $("probeResult");
-  result.innerHTML = '<div class="probe-loading">⏳ Checking feed…</div>';
+  result.innerHTML = '<div class="probe-loading">🔍 Searching for feeds…</div>';
   result.style.display = "";
   btn.disabled = true;
 
   try {
-    const resp = await fetch("/api/probe-feed?" + new URLSearchParams({ url }));
+    const resp = await fetch("/api/discover-feeds?" + new URLSearchParams({ q }));
     const data = await resp.json();
 
-    if (!data.ok) {
-      result.innerHTML = `<div class="probe-error">❌ ${esc(data.error)}</div>`;
+    if (!data.feeds || data.feeds.length === 0) {
+      result.innerHTML = `<div class="probe-error">❌ No RSS/Atom feeds found at this site.</div>`;
       return;
     }
 
-    const already = isAdded(data.feed_url);
-    const typeOptions = Object.keys(TYPE_COLORS)
-      .map(t => `<option${t === "Think Tank" ? " selected" : ""}>${esc(t)}</option>`)
-      .join("");
-
-    result.innerHTML = `
-      <div class="probe-preview">
-        <div class="probe-feed-name">${esc(data.name)}</div>
-        <div class="probe-feed-meta">${data.count} items in feed</div>
-        ${data.sample.map(s =>
-          `<div class="probe-sample-item">• <a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.title)}</a></div>`
-        ).join("")}
-        ${already
-          ? `<div class="probe-already-note">✓ Already in your sources</div>`
-          : `<div class="probe-actions">
-              <input id="probeName" class="probe-name-input" value="${esc(data.name)}" placeholder="Display name">
-              <select id="probeType" class="probe-type-select">${typeOptions}</select>
-              <button class="src-add-btn" onclick="addProbed('${esc(data.feed_url)}')">+ Add to Dashboard</button>
-             </div>`
-        }
-      </div>`;
+    if (data.feeds.length === 1) {
+      // Single result — show editable name + type selector before adding
+      const f = data.feeds[0];
+      const already = isAdded(f.url);
+      const typeOptions = Object.keys(TYPE_COLORS)
+        .map(t => `<option${t === "Media" ? " selected" : ""}>${esc(t)}</option>`)
+        .join("");
+      result.innerHTML = `
+        <div class="probe-preview">
+          <div class="probe-feed-name">${esc(f.name)}</div>
+          <div class="probe-feed-meta">${f.count} items in feed</div>
+          ${f.sample.map(s =>
+            `<div class="probe-sample-item">• <a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.title)}</a></div>`
+          ).join("")}
+          ${already
+            ? `<div class="probe-already-note">✓ Already in your sources</div>`
+            : `<div class="probe-actions">
+                <input id="probeName" class="probe-name-input" value="${esc(f.name)}" placeholder="Display name">
+                <select id="probeType" class="probe-type-select">${typeOptions}</select>
+                <button class="src-add-btn" onclick="addProbed('${esc(f.url)}')">+ Add to Dashboard</button>
+               </div>`
+          }
+        </div>`;
+    } else {
+      // Multiple feeds found — show compact list with one-click add
+      const typeOptions = Object.keys(TYPE_COLORS)
+        .map(t => `<option${t === "Media" ? " selected" : ""}>${esc(t)}</option>`)
+        .join("");
+      result.innerHTML = `
+        <div class="probe-multi-header">${data.feeds.length} feeds found</div>
+        ${data.feeds.map((f, i) => {
+          const already = isAdded(f.url);
+          const btnId = `_pb${i}`;
+          return `
+            <div class="probe-multi-item">
+              <div class="probe-multi-info">
+                <div class="probe-feed-name">${esc(f.name)}</div>
+                <div class="probe-feed-meta">${f.count} items</div>
+              </div>
+              <div id="${btnId}">
+                ${already
+                  ? `<span class="probe-already-badge">✓ Added</span>`
+                  : `<button class="src-add-btn probe-quick-add"
+                       onclick="addProbedQuick('${esc(f.url)}','${esc(f.name)}','${btnId}')">+ Add</button>`
+                }
+              </div>
+            </div>`;
+        }).join("")}`;
+    }
   } catch (e) {
     result.innerHTML = `<div class="probe-error">❌ ${esc(e.message)}</div>`;
   } finally {
@@ -1119,12 +1168,21 @@ async function testCustomFeed() {
 }
 
 async function addProbed(feedUrl) {
-  const name  = ($("probeName")?.value.trim())  || feedUrl;
-  const type  = ($("probeType")?.value)          || "Think Tank";
+  const name  = ($("probeName")?.value.trim()) || feedUrl;
+  const type  = ($("probeType")?.value)        || "Media";
   const color = TYPE_COLORS[type] || "#4a5568";
   await addFeed({ name, url: feedUrl, type, color });
   $("probeResult").style.display = "none";
   $("customFeedUrl").value = "";
+}
+
+async function addProbedQuick(feedUrl, feedName, btnContainerId) {
+  const type  = "Media";
+  const color = TYPE_COLORS[type] || "#4a5568";
+  const container = $(btnContainerId);
+  if (container) container.innerHTML = "<span class='probe-already-badge'>Adding…</span>";
+  await addFeed({ name: feedName, url: feedUrl, type, color });
+  if (container) container.innerHTML = "<span class='probe-already-badge'>✓ Added</span>";
 }
 
 function render() {

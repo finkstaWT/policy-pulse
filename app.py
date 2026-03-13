@@ -303,6 +303,109 @@ def api_probe_feed():
         return jsonify({"ok": False, "error": str(exc)})
 
 
+@app.route("/api/discover-feeds")
+def api_discover_feeds():
+    """
+    Discover all RSS/Atom feeds available at a site.
+    Accepts ?q= as either a full URL or bare domain (e.g. vox.com).
+    Returns {"feeds": [{url, name, count, sample}, …]} — up to 6 results.
+    """
+    import feedparser as _fp
+    import requests as _req
+
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"feeds": [], "error": "No URL or domain provided"})
+
+    url = q if q.startswith(("http://", "https://")) else "https://" + q
+
+    from urllib.parse import urlparse as _parse
+    parsed = _parse(url)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+
+    # --- Step 1: fetch the site's homepage and harvest <link> feed tags ---
+    candidates = [url]
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            r = _req.get(base, headers=_HEADERS, timeout=10,
+                         verify=False, allow_redirects=True)
+        html = r.content.decode("utf-8", errors="replace")
+        for pattern in [
+            r'<link[^>]+type=["\']application/(?:rss|atom)\+xml["\'][^>]*href=["\']([^"\']+)["\']',
+            r'<link[^>]+href=["\']([^"\']+)["\'][^>]*type=["\']application/(?:rss|atom)\+xml["\']',
+        ]:
+            for m in re.finditer(pattern, html, re.IGNORECASE):
+                candidates.append(urljoin(base, m.group(1)))
+    except Exception:
+        pass
+
+    # --- Step 2: common feed path patterns to try on the base domain ---
+    _FEED_PATHS = [
+        "/feed", "/feed/", "/rss", "/rss.xml", "/feed.xml", "/atom.xml",
+        "/feeds/all.atom.xml", "/index.xml", "/?feed=rss2",
+        "/rss/feed.xml", "/news.rss", "/blog/feed", "/blog/rss.xml",
+    ]
+    for path in _FEED_PATHS:
+        candidates.append(base + path)
+
+    # Deduplicate while preserving order (HTML-discovered feeds first)
+    seen_c: set = set()
+    unique_candidates = []
+    for c in candidates:
+        if c not in seen_c:
+            seen_c.add(c)
+            unique_candidates.append(c)
+
+    # --- Step 3: probe all candidates in parallel ---
+    now = datetime.utcnow()
+
+    def _probe_one(candidate: str):
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                r = _req.get(candidate, headers=_HEADERS, timeout=8,
+                             verify=False, allow_redirects=True)
+            feed = _fp.parse(r.content)
+            if not feed.entries:
+                return None
+            name = _strip_html(getattr(feed.feed, "title", "") or "") or candidate
+            sample = []
+            for entry in feed.entries[:3]:
+                pub = _parse_date(entry)
+                if pub is None or pub > now:
+                    pub = now
+                sample.append({
+                    "title":     _strip_html(entry.get("title", "Untitled")),
+                    "link":      entry.get("link", "#"),
+                    "published": pub.strftime("%b %d, %Y"),
+                })
+            return {"url": candidate, "name": name,
+                    "count": len(feed.entries), "sample": sample}
+        except Exception:
+            return None
+
+    pool = ThreadPoolExecutor(max_workers=8)
+    fut_map = {pool.submit(_probe_one, c): c for c in unique_candidates}
+    done, _ = _futures_wait(list(fut_map.keys()), timeout=20)
+
+    results = []
+    seen_names: set = set()
+    for fut in done:
+        try:
+            res = fut.result()
+            if res and res["name"] not in seen_names:
+                seen_names.add(res["name"])
+                results.append(res)
+        except Exception:
+            pass
+    pool.shutdown(wait=False)
+
+    # Sort by item count (richer feeds first), cap at 6
+    results.sort(key=lambda x: x["count"], reverse=True)
+    return jsonify({"feeds": results[:6]})
+
+
 @app.route("/api/custom-fetch", methods=["POST"])
 def api_custom_fetch():
     """Fetch items from caller-supplied feed configs (user-added sources)."""
