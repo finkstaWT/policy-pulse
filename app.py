@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime as _rfc2822
 from pathlib import Path
 from urllib.parse import urljoin
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait as _futures_wait
 from flask import Flask, render_template, jsonify, request
 
 app = Flask(__name__)
@@ -169,11 +169,19 @@ def fetch_all() -> list[dict]:
         now = datetime.utcnow()
         results = []
 
-        # Fetch all feeds in parallel — cap at 10 workers for free-tier stability
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            futures = {pool.submit(_fetch_one, cfg, now): cfg for cfg in FEED_CONFIG}
-            for future in as_completed(futures):
-                results.extend(future.result())
+        # Fetch all feeds in parallel — cap at 10 workers for free-tier stability.
+        # Use a hard 30s wall-clock timeout so a single hung DNS lookup never
+        # blocks the warm-up thread (and the gunicorn worker waiting on _fetch_lock)
+        # long enough to trigger a 502.
+        pool = ThreadPoolExecutor(max_workers=10)
+        futures = {pool.submit(_fetch_one, cfg, now): cfg for cfg in FEED_CONFIG}
+        done, _ = _futures_wait(list(futures.keys()), timeout=30)
+        for fut in done:
+            try:
+                results.extend(fut.result())
+            except Exception:
+                pass
+        pool.shutdown(wait=False)   # don't block on any still-running threads
 
         results.sort(key=lambda x: x["published_ts"], reverse=True)
         _set_cache("items", results)
@@ -298,10 +306,15 @@ def api_custom_fetch():
 
     now = datetime.utcnow()
     results = []
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = [pool.submit(_fetch_one, cfg, now) for cfg in feeds]
-        for future in as_completed(futures):
-            results.extend(future.result())
+    pool = ThreadPoolExecutor(max_workers=5)
+    futures = [pool.submit(_fetch_one, cfg, now) for cfg in feeds]
+    done, _ = _futures_wait(futures, timeout=30)
+    for fut in done:
+        try:
+            results.extend(fut.result())
+        except Exception:
+            pass
+    pool.shutdown(wait=False)
 
     results.sort(key=lambda x: x["published_ts"], reverse=True)
     return jsonify({"items": results})
