@@ -388,10 +388,10 @@
       border-radius: 10px;
       box-shadow: 0 8px 24px rgba(0,0,0,.12);
       width: 310px;
-      max-height: 560px;
+      max-height: 600px;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow-y: auto;
     }
     .src-panel.hidden { display: none !important; }
 
@@ -516,7 +516,7 @@
     .src-test-btn:hover { background: #2563eb; }
     .src-test-btn:disabled { opacity: .5; cursor: not-allowed; }
 
-    .probe-result { margin-top: 8px; font-size: .8rem; }
+    .probe-result { margin-top: 8px; font-size: .8rem; overflow-y: auto; }
     .probe-loading { color: var(--muted); font-style: italic; }
     .probe-error { color: var(--red); }
     .probe-preview {
