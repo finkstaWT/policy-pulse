@@ -403,6 +403,24 @@ def api_discover_feeds():
 
     # Sort by item count (richer feeds first), cap at 6
     results.sort(key=lambda x: x["count"], reverse=True)
+
+    # --- Step 4: Google News fallback when no direct feeds found ---
+    # Google publishes a free RSS feed for any site: ?q=site:domain.com
+    # This is a legitimate workaround for sites with no native RSS feed.
+    if not results:
+        netloc = parsed.netloc
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+        gnews_url = (
+            f"https://news.google.com/rss/search"
+            f"?q=site:{netloc}&hl=en-US&gl=US&ceid=US:en"
+        )
+        gnews_res = _probe_one(gnews_url)   # sync — only one URL to check
+        if gnews_res:
+            gnews_res["via_google"] = True
+            gnews_res["name"] = netloc      # clean domain, not Google's title
+            results.append(gnews_res)
+
     return jsonify({"feeds": results[:6]})
 
 

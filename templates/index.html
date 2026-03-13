@@ -548,6 +548,17 @@
     .probe-already-note { color: var(--green); font-weight: 600; margin-top: 6px; }
     .no-suggestions { padding: 8px 12px; font-size: .78rem; color: var(--subtle); font-style: italic; }
 
+    /* Google News fallback label */
+    .probe-gnews-note {
+      font-size: .74rem; color: #5f6368;
+      background: #f8f9fa; border: 1px solid var(--border);
+      border-radius: 5px; padding: 5px 8px; margin-bottom: 8px;
+    }
+    .probe-gnews-badge {
+      font-size: .65rem; color: #5f6368; background: #f1f3f4;
+      border-radius: 3px; padding: 2px 6px; white-space: nowrap; flex-shrink: 0;
+    }
+
     /* multi-feed discover results */
     .probe-multi-header {
       font-size: .72rem; font-weight: 700; color: var(--subtle);
@@ -1118,8 +1129,12 @@ async function discoverFeeds() {
       const typeOptions = Object.keys(TYPE_COLORS)
         .map(t => `<option${t === "Media" ? " selected" : ""}>${esc(t)}</option>`)
         .join("");
+      const gnewsNote = f.via_google
+        ? `<div class="probe-gnews-note">📰 No direct RSS feed found — showing recent articles via Google News</div>`
+        : "";
       result.innerHTML = `
         <div class="probe-preview">
+          ${gnewsNote}
           <div class="probe-feed-name">${esc(f.name)}</div>
           <div class="probe-feed-meta">${f.count} items in feed</div>
           ${f.sample.map(s =>
@@ -1136,18 +1151,17 @@ async function discoverFeeds() {
         </div>`;
     } else {
       // Multiple feeds found — show compact list with one-click add
-      const typeOptions = Object.keys(TYPE_COLORS)
-        .map(t => `<option${t === "Media" ? " selected" : ""}>${esc(t)}</option>`)
-        .join("");
       result.innerHTML = `
         <div class="probe-multi-header">${data.feeds.length} feeds found</div>
         ${data.feeds.map((f, i) => {
           const already = isAdded(f.url);
           const btnId = `_pb${i}`;
+          const gBadge = f.via_google
+            ? `<span class="probe-gnews-badge">via Google News</span>` : "";
           return `
             <div class="probe-multi-item">
               <div class="probe-multi-info">
-                <div class="probe-feed-name">${esc(f.name)}</div>
+                <div class="probe-feed-name">${esc(f.name)} ${gBadge}</div>
                 <div class="probe-feed-meta">${f.count} items</div>
               </div>
               <div id="${btnId}">
