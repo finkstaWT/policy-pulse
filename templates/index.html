@@ -758,26 +758,38 @@ function relDate(d) {
 }
 
 // ── Load / Refresh ─────────────────────────────────────────────────
+let _warmRetry = null;   // handle for the auto-retry timer when server is warming
+
 async function loadItems(forceRefresh = false) {
+  clearTimeout(_warmRetry);
   $("loading").style.display = "";
+  $("loading").querySelector(".state-msg").innerHTML =
+    "Fetching the latest from <strong id=\"srcCount\">—</strong> sources…";
   $("grid").style.display = "none";
   $("emptyState").style.display = "none";
   $("errorState").style.display = "none";
 
   try {
-    // 90s timeout — first load fetches feeds in parallel, give it time
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 90000);
-
     if (forceRefresh) {
-      await fetch("/api/refresh", { method: "POST", signal: controller.signal });
+      // /api/refresh blocks until it has fresh data (user-initiated, ~30s max)
+      const r = await fetch("/api/refresh", { method: "POST" });
+      if (!r.ok) throw new Error(`Refresh failed: HTTP ${r.status}`);
     }
-    const resp = await fetch("/api/items", { signal: controller.signal });
-    clearTimeout(timer);
 
+    const resp = await fetch("/api/items");
     if (!resp.ok) throw new Error(`Server returned HTTP ${resp.status}`);
     const data = await resp.json();
     $("srcCount").textContent = data.sources || "—";
+
+    if (data.warming) {
+      // Background feed-fetch still running (cold start) — retry automatically
+      $("loading").querySelector(".state-msg").innerHTML =
+        "⏳ Server is waking up — feeds loading in the background." +
+        "<br><small>This page will refresh automatically in ~30 s.</small>";
+      _warmRetry = setTimeout(() => loadItems(), 35000);
+      return;
+    }
+
     processData(data);
 
     // Silently fetch any user-added custom feeds and merge
@@ -787,10 +799,7 @@ async function loadItems(forceRefresh = false) {
   } catch (e) {
     $("loading").style.display = "none";
     $("errorState").style.display = "";
-    const msg = e.name === "AbortError"
-      ? "Request timed out — the server may still be waking up. Try refreshing in a moment."
-      : `Error: ${e.message}`;
-    $("errorMsg").textContent = msg;
+    $("errorMsg").textContent = `Error: ${e.message}`;
   }
 }
 

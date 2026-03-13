@@ -205,11 +205,18 @@ def index():
 
 @app.route("/api/items")
 def api_items():
-    items = fetch_all()
+    # Never block the worker — return whatever is in cache instantly.
+    # If the cache is still cold (server just woke up), return warming=True
+    # so the frontend knows to retry in ~35 s once the background fetch finishes.
+    items = _get_cache("items")
+    warming = items is None
+    if warming:
+        items = []
     org_types = sorted({i["org_type"] for i in items})
     return jsonify({
         "items":      items,
         "org_types":  org_types,
+        "warming":    warming,
         "fetched_at": datetime.now().strftime("%b %d, %Y at %I:%M %p"),
         "count":      len(items),
         "sources":    len(FEED_CONFIG),
