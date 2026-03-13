@@ -8,8 +8,9 @@ import threading
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime as _rfc2822
 from pathlib import Path
+from urllib.parse import urljoin
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 
 app = Flask(__name__)
 
@@ -217,6 +218,93 @@ def api_refresh():
         "count":      len(items),
         "fetched_at": datetime.now().strftime("%b %d, %Y at %I:%M %p"),
     })
+
+
+@app.route("/api/probe-feed")
+def api_probe_feed():
+    """Validate a URL as an RSS feed, with HTML auto-discovery fallback."""
+    import feedparser
+    import requests as _req
+
+    url = request.args.get("url", "").strip()
+    if not url:
+        return jsonify({"ok": False, "error": "No URL provided"})
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    now = datetime.utcnow()
+
+    def try_parse(feed_url):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            r = _req.get(feed_url, headers=_HEADERS, timeout=10, verify=False, allow_redirects=True)
+        return feedparser.parse(r.content), r
+
+    try:
+        feed, resp = try_parse(url)
+        feed_url = url
+
+        if not feed.entries:
+            # Auto-discover RSS/Atom link from HTML
+            html = resp.content.decode("utf-8", errors="replace")
+            discovered = False
+            for pattern in [
+                r'<link[^>]+type=["\']application/(?:rss|atom)\+xml["\'][^>]*href=["\']([^"\']+)["\']',
+                r'<link[^>]+href=["\']([^"\']+)["\'][^>]*type=["\']application/(?:rss|atom)\+xml["\']',
+            ]:
+                for m in re.finditer(pattern, html, re.IGNORECASE):
+                    candidate = urljoin(url, m.group(1))
+                    feed, _ = try_parse(candidate)
+                    if feed.entries:
+                        feed_url = candidate
+                        discovered = True
+                        break
+                if discovered:
+                    break
+            if not discovered:
+                return jsonify({"ok": False, "error": "No RSS feed found at this URL"})
+
+        feed_name = _strip_html(getattr(feed.feed, "title", "") or "") or url
+        sample = []
+        for entry in feed.entries[:3]:
+            pub = _parse_date(entry)
+            if pub is None or pub > now:
+                pub = now
+            sample.append({
+                "title":     _strip_html(entry.get("title", "Untitled")),
+                "link":      entry.get("link", "#"),
+                "published": pub.strftime("%b %d, %Y"),
+            })
+
+        return jsonify({
+            "ok":       True,
+            "feed_url": feed_url,
+            "name":     feed_name,
+            "count":    len(feed.entries),
+            "sample":   sample,
+        })
+
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)})
+
+
+@app.route("/api/custom-fetch", methods=["POST"])
+def api_custom_fetch():
+    """Fetch items from caller-supplied feed configs (user-added sources)."""
+    body = request.get_json(force=True, silent=True) or {}
+    feeds = body.get("feeds", [])
+    if not feeds:
+        return jsonify({"items": []})
+
+    now = datetime.utcnow()
+    results = []
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = [pool.submit(_fetch_one, cfg, now) for cfg in feeds]
+        for future in as_completed(futures):
+            results.extend(future.result())
+
+    results.sort(key=lambda x: x["published_ts"], reverse=True)
+    return jsonify({"items": results})
 
 
 if __name__ == "__main__":

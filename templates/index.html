@@ -387,8 +387,8 @@
       border: 1px solid var(--border);
       border-radius: 10px;
       box-shadow: 0 8px 24px rgba(0,0,0,.12);
-      width: 270px;
-      max-height: 380px;
+      width: 310px;
+      max-height: 560px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -416,7 +416,7 @@
     }
     .src-ctrl-btn:hover { text-decoration: underline; }
 
-    .src-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+    .src-list { overflow-y: auto; flex: none; max-height: 180px; padding: 6px 0; }
 
     .src-group-label {
       padding: 6px 12px 3px;
@@ -440,6 +440,113 @@
     .src-option input[type=checkbox] { accent-color: var(--purple); cursor: pointer; flex-shrink: 0; }
     .src-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .src-name { font-size: .8rem; color: var(--text); flex: 1; }
+
+    /* ── Discover / Add Sources section ─────────────────── */
+    .src-section-divider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px 6px;
+      flex-shrink: 0;
+    }
+    .src-section-divider::before, .src-section-divider::after {
+      content: ""; flex: 1; height: 1px; background: var(--border);
+    }
+    .src-section-label {
+      font-size: .67rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: var(--subtle); white-space: nowrap;
+    }
+
+    .src-suggest-bar { padding: 0 10px 8px; flex-shrink: 0; }
+    .src-suggest-input {
+      width: 100%; padding: 6px 10px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: .78rem; color: var(--text); outline: none;
+      transition: border-color .15s;
+    }
+    .src-suggest-input:focus { border-color: var(--blue); }
+    .src-suggest-input::placeholder { color: var(--subtle); }
+
+    .src-suggest-list {
+      overflow-y: auto; max-height: 150px; flex-shrink: 0;
+      border-top: 1px solid var(--border);
+    }
+    .suggest-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 12px; transition: background .1s;
+    }
+    .suggest-item:hover { background: #f8fafc; }
+    .suggest-name {
+      font-size: .79rem; color: var(--text); flex: 1;
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .suggest-type { font-size: .67rem; color: var(--subtle); flex-shrink: 0; }
+    .suggest-add-btn {
+      font-size: .72rem; font-weight: 600; color: var(--blue);
+      background: none; border: 1px solid currentColor;
+      border-radius: 4px; padding: 2px 7px; cursor: pointer;
+      flex-shrink: 0; white-space: nowrap; transition: all .15s;
+    }
+    .suggest-add-btn:hover { background: var(--blue); color: #fff; }
+    .suggest-added-btn {
+      font-size: .72rem; font-weight: 600; color: var(--green);
+      background: none; border: 1px solid currentColor;
+      border-radius: 4px; padding: 2px 7px; cursor: pointer;
+      flex-shrink: 0; white-space: nowrap; transition: all .15s;
+    }
+    .suggest-added-btn:hover { background: #fef2f2; color: var(--red); border-color: var(--red); }
+
+    .src-custom-area {
+      padding: 10px; border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    .src-custom-row { display: flex; gap: 6px; }
+    .src-custom-input {
+      flex: 1; padding: 6px 10px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: .78rem; color: var(--text); outline: none; min-width: 0;
+      transition: border-color .15s;
+    }
+    .src-custom-input:focus { border-color: var(--blue); }
+    .src-custom-input::placeholder { color: var(--subtle); font-size: .73rem; }
+    .src-test-btn {
+      padding: 6px 12px; background: var(--blue); color: #fff;
+      border: none; border-radius: 6px; font-size: .78rem; font-weight: 600;
+      cursor: pointer; flex-shrink: 0; transition: background .15s;
+    }
+    .src-test-btn:hover { background: #2563eb; }
+    .src-test-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .probe-result { margin-top: 8px; font-size: .8rem; }
+    .probe-loading { color: var(--muted); font-style: italic; }
+    .probe-error { color: var(--red); }
+    .probe-preview {
+      background: #f8fafc; border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 10px;
+    }
+    .probe-feed-name { font-weight: 700; color: var(--text); margin-bottom: 2px; font-size: .82rem; }
+    .probe-feed-meta { font-size: .72rem; color: var(--subtle); margin-bottom: 6px; }
+    .probe-sample-item {
+      font-size: .74rem; color: var(--muted); margin: 2px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .probe-sample-item a { color: var(--blue); text-decoration: none; }
+    .probe-sample-item a:hover { text-decoration: underline; }
+    .probe-actions { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+    .probe-name-input, .probe-type-select {
+      width: 100%; padding: 5px 8px;
+      border: 1px solid var(--border); border-radius: 5px;
+      font-size: .78rem; color: var(--text); outline: none; background: #fff;
+    }
+    .probe-name-input:focus, .probe-type-select:focus { border-color: var(--blue); }
+    .probe-type-select { cursor: pointer; }
+    .src-add-btn {
+      padding: 6px 12px; background: var(--green); color: #fff;
+      border: none; border-radius: 6px; font-size: .78rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    .src-add-btn:hover { background: #16a34a; }
+    .probe-already-note { color: var(--green); font-weight: 600; margin-top: 6px; }
+    .no-suggestions { padding: 8px 12px; font-size: .78rem; color: var(--subtle); font-style: italic; }
 
     /* ── Toast ───────────────────────────────────────────── */
     #toast {
@@ -524,6 +631,25 @@
           </div>
         </div>
         <div class="src-list" id="srcList"></div>
+
+        <!-- ── Add Sources section ── -->
+        <div class="src-section-divider"><span class="src-section-label">Add Sources</span></div>
+
+        <div class="src-suggest-bar">
+          <input type="text" id="suggestSearch" class="src-suggest-input"
+                 placeholder="Search suggestions…" oninput="filterSuggestions()">
+        </div>
+        <div class="src-suggest-list" id="suggestList"></div>
+
+        <div class="src-custom-area">
+          <div class="src-custom-row">
+            <input type="url" id="customFeedUrl" class="src-custom-input"
+                   placeholder="Or paste any RSS/Atom URL…"
+                   onkeydown="if(event.key==='Enter')testCustomFeed()">
+            <button class="src-test-btn" id="testFeedBtn" onclick="testCustomFeed()">Test</button>
+          </div>
+          <div id="probeResult" class="probe-result" style="display:none"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -573,6 +699,8 @@
 <script>
 // ── State ──────────────────────────────────────────────────────────
 let allItems      = [];
+let baseItems     = [];   // items from /api/items
+let customItems   = [];   // items from /api/custom-fetch
 let orgTypes      = [];
 let activeTags    = new Set(["breaking", "newsy", "evergreen"]);
 let activeTypes   = new Set();
@@ -582,6 +710,27 @@ let bookmarksOnly = false;
 let searchQ       = "";
 let currentView   = "grid";
 let bookmarks     = new Set(JSON.parse(localStorage.getItem("pp_bm") || "[]"));
+let customFeeds   = JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]");
+
+// Curated suggestions (verified working feeds not in the default set)
+const CURATED = [
+  { name: "Atlantic Council",              url: "https://www.atlanticcouncil.org/feed/",  type: "Think Tank", color: "#1a3a5c" },
+  { name: "Niskanen Center",               url: "https://niskanencenter.org/feed/",        type: "Think Tank", color: "#2e4057" },
+  { name: "R Street Institute",            url: "https://rstreet.org/feed/",               type: "Think Tank", color: "#7b241c" },
+  { name: "Stateline (Pew)",               url: "https://stateline.org/feed/",             type: "Research",   color: "#154360" },
+  { name: "KFF",                           url: "https://www.kff.org/feed/",               type: "Research",   color: "#922b21" },
+  { name: "CA Health Care Foundation",     url: "https://www.chcf.org/feed/",              type: "Research",   color: "#1d6a39" },
+  { name: "Eno Transportation Foundation", url: "https://enotrans.org/feed/",              type: "Think Tank", color: "#34495e" },
+  { name: "T4America",                     url: "https://www.t4america.org/feed/",         type: "Advocacy",   color: "#c0392b" },
+  { name: "Carbon180",                     url: "https://carbon180.org/feed/",             type: "Advocacy",   color: "#196f3d" },
+];
+
+// Map type → default badge color for newly probed feeds
+const TYPE_COLORS = {
+  "Think Tank":  "#1a3a5c", "Research":   "#154360", "Trade Org":   "#1d6a39",
+  "Trade Union": "#7d6608", "Advocacy":   "#6c3483", "Government":  "#922b21",
+  "Media":       "#1a5276",
+};
 
 // ── Helpers ────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -616,7 +765,7 @@ async function loadItems(forceRefresh = false) {
   $("errorState").style.display = "none";
 
   try {
-    // 90s timeout — first load fetches 22 feeds in parallel, give it time
+    // 90s timeout — first load fetches feeds in parallel, give it time
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 90000);
 
@@ -630,6 +779,11 @@ async function loadItems(forceRefresh = false) {
     const data = await resp.json();
     $("srcCount").textContent = data.sources || "—";
     processData(data);
+
+    // Silently fetch any user-added custom feeds and merge
+    if (customFeeds.length > 0) {
+      await fetchCustomItems();
+    }
   } catch (e) {
     $("loading").style.display = "none";
     $("errorState").style.display = "";
@@ -641,28 +795,64 @@ async function loadItems(forceRefresh = false) {
 }
 
 function processData(data) {
-  allItems = data.items || [];
-  orgTypes = data.org_types || [];
-  activeTypes = new Set(orgTypes);
+  baseItems = data.items || [];
+  $("lastUpdated").textContent = "Updated " + (data.fetched_at || "—");
+  $("loading").style.display = "none";
+  mergeAndRefresh();
+}
 
-  // Build unique source list in stable order (by type, then name)
+function mergeAndRefresh() {
+  // Merge base + custom, deduplicate by id
   const seen = new Set();
+  allItems = [...baseItems, ...customItems]
+    .filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; })
+    .sort((a, b) => b.published_ts - a.published_ts);
+
+  // Rebuild org types
+  orgTypes = [...new Set(allItems.map(i => i.org_type))].sort();
+
+  // Rebuild sources list
+  const seenSrc = new Set();
+  const prevActive = new Set(activeSources);  // keep existing selections
   allSources = [];
-  [...allItems].sort((a,b) => (a.org_type+a.org).localeCompare(b.org_type+b.org))
+  [...allItems]
+    .sort((a,b) => (a.org_type+a.org).localeCompare(b.org_type+b.org))
     .forEach(i => {
-      if (!seen.has(i.org)) {
-        seen.add(i.org);
+      if (!seenSrc.has(i.org)) {
+        seenSrc.add(i.org);
         allSources.push({ name: i.org, color: i.org_color, type: i.org_type });
       }
     });
-  activeSources = new Set(allSources.map(s => s.name));
 
-  $("lastUpdated").textContent = "Updated " + (data.fetched_at || "—");
-  $("loading").style.display = "none";
+  // New sources start active; previously deselected sources stay deselected
+  activeSources = new Set(
+    allSources.map(s => s.name).filter(n => prevActive.size === 0 || prevActive.has(n))
+  );
+  if (activeSources.size === 0) activeSources = new Set(allSources.map(s => s.name));
+
+  // New org types start active
+  orgTypes.forEach(t => activeTypes.add(t));
 
   buildOrgFilters();
   buildSourceDropdown();
   render();
+}
+
+async function fetchCustomItems() {
+  if (customFeeds.length === 0) { customItems = []; mergeAndRefresh(); return; }
+  try {
+    const resp = await fetch("/api/custom-fetch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feeds: customFeeds }),
+    });
+    const data = await resp.json();
+    customItems = data.items || [];
+  } catch (e) {
+    console.warn("Custom feeds failed:", e);
+    customItems = [];
+  }
+  mergeAndRefresh();
 }
 
 async function doRefresh() {
@@ -763,6 +953,7 @@ function buildSourceDropdown() {
   `).join("");
 
   updateSrcBtn();
+  buildSuggestList();
 }
 
 function updateSrcBtn() {
@@ -805,6 +996,127 @@ document.addEventListener("click", e => {
     $("srcPanel").classList.add("hidden");
   }
 });
+
+// ── Discover / Add Sources ──────────────────────────────────────────
+function saveCustomFeeds() {
+  localStorage.setItem("pp_custom_feeds", JSON.stringify(customFeeds));
+}
+
+function isAdded(url) {
+  return customFeeds.some(f => f.url === url);
+}
+
+function buildSuggestList() {
+  const list = $("suggestList");
+  if (!list) return;
+  const q = ($("suggestSearch")?.value || "").toLowerCase();
+  const visible = CURATED.filter(s =>
+    !q || s.name.toLowerCase().includes(q) || s.type.toLowerCase().includes(q)
+  );
+  if (visible.length === 0) {
+    list.innerHTML = '<div class="no-suggestions">No matches</div>';
+    return;
+  }
+  list.innerHTML = visible.map(s => {
+    const added = isAdded(s.url);
+    return `<div class="suggest-item">
+      <span class="src-dot" style="background:${esc(s.color)}"></span>
+      <span class="suggest-name" title="${esc(s.name)}">${esc(s.name)}</span>
+      <span class="suggest-type">${esc(s.type)}</span>
+      ${added
+        ? `<button class="suggest-added-btn" onclick="removeFeedByUrl('${esc(s.url)}')" title="Click to remove">✓</button>`
+        : `<button class="suggest-add-btn" onclick="addSuggestion('${esc(s.url)}')">+ Add</button>`
+      }
+    </div>`;
+  }).join("");
+}
+
+function filterSuggestions() { buildSuggestList(); }
+
+async function addFeed(feed) {
+  if (isAdded(feed.url)) return;
+  customFeeds.push(feed);
+  saveCustomFeeds();
+  showToast(`Adding "${feed.name}"…`);
+  buildSuggestList();
+  await fetchCustomItems();
+  showToast(`✓ "${feed.name}" added to dashboard`);
+}
+
+function addSuggestion(url) {
+  const feed = CURATED.find(s => s.url === url);
+  if (feed) addFeed({ ...feed });
+}
+
+function removeFeedByUrl(url) {
+  const feed = customFeeds.find(f => f.url === url);
+  if (!feed) return;
+  customFeeds = customFeeds.filter(f => f.url !== url);
+  saveCustomFeeds();
+  customItems = customItems.filter(i => i.org !== feed.name);
+  // Also remove from activeSources so it doesn't orphan the filter
+  activeSources.delete(feed.name);
+  mergeAndRefresh();
+  buildSuggestList();
+  showToast(`Removed "${feed.name}"`);
+}
+
+async function testCustomFeed() {
+  const urlInput = $("customFeedUrl");
+  const btn = $("testFeedBtn");
+  const url = urlInput.value.trim();
+  if (!url) { showToast("Please enter a URL to test."); return; }
+
+  const result = $("probeResult");
+  result.innerHTML = '<div class="probe-loading">⏳ Checking feed…</div>';
+  result.style.display = "";
+  btn.disabled = true;
+
+  try {
+    const resp = await fetch("/api/probe-feed?" + new URLSearchParams({ url }));
+    const data = await resp.json();
+
+    if (!data.ok) {
+      result.innerHTML = `<div class="probe-error">❌ ${esc(data.error)}</div>`;
+      return;
+    }
+
+    const already = isAdded(data.feed_url);
+    const typeOptions = Object.keys(TYPE_COLORS)
+      .map(t => `<option${t === "Think Tank" ? " selected" : ""}>${esc(t)}</option>`)
+      .join("");
+
+    result.innerHTML = `
+      <div class="probe-preview">
+        <div class="probe-feed-name">${esc(data.name)}</div>
+        <div class="probe-feed-meta">${data.count} items in feed</div>
+        ${data.sample.map(s =>
+          `<div class="probe-sample-item">• <a href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.title)}</a></div>`
+        ).join("")}
+        ${already
+          ? `<div class="probe-already-note">✓ Already in your sources</div>`
+          : `<div class="probe-actions">
+              <input id="probeName" class="probe-name-input" value="${esc(data.name)}" placeholder="Display name">
+              <select id="probeType" class="probe-type-select">${typeOptions}</select>
+              <button class="src-add-btn" onclick="addProbed('${esc(data.feed_url)}')">+ Add to Dashboard</button>
+             </div>`
+        }
+      </div>`;
+  } catch (e) {
+    result.innerHTML = `<div class="probe-error">❌ ${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function addProbed(feedUrl) {
+  const name  = ($("probeName")?.value.trim())  || feedUrl;
+  const type  = ($("probeType")?.value)          || "Think Tank";
+  const color = TYPE_COLORS[type] || "#4a5568";
+  await addFeed({ name, url: feedUrl, type, color });
+  $("probeResult").style.display = "none";
+  $("customFeedUrl").value = "";
+}
 
 function render() {
   const items = filtered();
