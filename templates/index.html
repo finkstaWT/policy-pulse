@@ -817,8 +817,11 @@ async function loadItems(forceRefresh = false) {
       // Background feed-fetch still running (cold start) — retry automatically
       $("loading").querySelector(".state-msg").innerHTML =
         "⏳ Server is waking up — feeds loading in the background." +
-        "<br><small>This page will refresh automatically in ~30 s.</small>";
-      _warmRetry = setTimeout(() => loadItems(), 35000);
+        `<br><small>Retrying in ~10 s &nbsp;·&nbsp;
+          <a href="#" style="color:var(--blue)"
+             onclick="event.preventDefault();clearTimeout(_warmRetry);loadItems()">
+            Retry now</a></small>`;
+      _warmRetry = setTimeout(() => loadItems(), 10000);
       return;
     }
 

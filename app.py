@@ -166,32 +166,46 @@ def fetch_all() -> list[dict]:
         if cached is not None:
             return cached
 
-        now = datetime.utcnow()
         results = []
+        try:
+            now = datetime.utcnow()
+            # Run all feeds in parallel.  One worker per feed so none has to
+            # queue behind another; each individual request already carries its
+            # own 10-second timeout, so the wall-clock cap is generous headroom.
+            pool = ThreadPoolExecutor(max_workers=len(FEED_CONFIG))
+            futures = {pool.submit(_fetch_one, cfg, now): cfg for cfg in FEED_CONFIG}
+            done, _ = _futures_wait(list(futures.keys()), timeout=25)
+            for fut in done:
+                try:
+                    results.extend(fut.result())
+                except Exception:
+                    pass
+            pool.shutdown(wait=False)
+            results.sort(key=lambda x: x["published_ts"], reverse=True)
+        except Exception as exc:
+            # Safety net: an unexpected error must never leave the cache as None
+            # forever — an empty list still lets the frontend out of warming state.
+            print(f"[error] fetch_all unexpected exception: {exc}")
 
-        # Fetch all feeds in parallel — cap at 10 workers for free-tier stability.
-        # Use a hard 30s wall-clock timeout so a single hung DNS lookup never
-        # blocks the warm-up thread (and the gunicorn worker waiting on _fetch_lock)
-        # long enough to trigger a 502.
-        pool = ThreadPoolExecutor(max_workers=10)
-        futures = {pool.submit(_fetch_one, cfg, now): cfg for cfg in FEED_CONFIG}
-        done, _ = _futures_wait(list(futures.keys()), timeout=30)
-        for fut in done:
-            try:
-                results.extend(fut.result())
-            except Exception:
-                pass
-        pool.shutdown(wait=False)   # don't block on any still-running threads
-
-        results.sort(key=lambda x: x["published_ts"], reverse=True)
-        _set_cache("items", results)
+        _set_cache("items", results)   # always called, even on exception / 0 results
         return results
 
 
 # ── Background cache warm-up on startup ───────────────────────────────────────
 def _warm_cache():
     print("[startup] Pre-fetching feeds in background…")
-    fetch_all()
+    try:
+        results = fetch_all()
+        if not results:
+            # Got 0 items — could be a transient network hiccup at boot.
+            # Clear the empty cache entry and try once more after a short pause.
+            print("[startup] Warm-up returned 0 items, retrying in 8 s…")
+            time.sleep(8)
+            with _cache_lock:
+                _cache.pop("items", None)
+            fetch_all()
+    except Exception as exc:
+        print(f"[startup] Warm-up failed: {exc}")
     print("[startup] Cache warm-up complete.")
 
 threading.Thread(target=_warm_cache, daemon=True).start()
