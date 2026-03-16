@@ -155,58 +155,78 @@ def _fetch_one(cfg: dict, now: datetime) -> list[dict]:
     return items
 
 
+def _run_fetch() -> list[dict]:
+    """Execute one parallel round of feed fetching. No locking — callers manage that."""
+    results = []
+    try:
+        now = datetime.utcnow()
+        pool = ThreadPoolExecutor(max_workers=len(FEED_CONFIG))
+        futures = [pool.submit(_fetch_one, cfg, now) for cfg in FEED_CONFIG]
+        done, _ = _futures_wait(futures, timeout=25)
+        for fut in done:
+            try:
+                results.extend(fut.result())
+            except Exception:
+                pass
+        pool.shutdown(wait=False)
+        results.sort(key=lambda x: x["published_ts"], reverse=True)
+    except Exception as exc:
+        print(f"[error] _run_fetch: {exc}")
+    return results
+
+
 def fetch_all() -> list[dict]:
     cached = _get_cache("items")
     if cached is not None:
         return cached
 
-    # Only one fetch at a time — any concurrent caller waits then hits cache
+    # Only one fetch at a time — concurrent callers wait then hit cache
     with _fetch_lock:
-        cached = _get_cache("items")   # re-check after acquiring lock
+        cached = _get_cache("items")
         if cached is not None:
             return cached
-
-        results = []
-        try:
-            now = datetime.utcnow()
-            # Run all feeds in parallel.  One worker per feed so none has to
-            # queue behind another; each individual request already carries its
-            # own 10-second timeout, so the wall-clock cap is generous headroom.
-            pool = ThreadPoolExecutor(max_workers=len(FEED_CONFIG))
-            futures = {pool.submit(_fetch_one, cfg, now): cfg for cfg in FEED_CONFIG}
-            done, _ = _futures_wait(list(futures.keys()), timeout=25)
-            for fut in done:
-                try:
-                    results.extend(fut.result())
-                except Exception:
-                    pass
-            pool.shutdown(wait=False)
-            results.sort(key=lambda x: x["published_ts"], reverse=True)
-        except Exception as exc:
-            # Safety net: an unexpected error must never leave the cache as None
-            # forever — an empty list still lets the frontend out of warming state.
-            print(f"[error] fetch_all unexpected exception: {exc}")
-
-        _set_cache("items", results)   # always called, even on exception / 0 results
+        results = _run_fetch()
+        _set_cache("items", results)
         return results
 
 
 # ── Background cache warm-up on startup ───────────────────────────────────────
 def _warm_cache():
+    """
+    Pre-fetch all feeds without holding _fetch_lock, so a hang here can
+    never block /api/refresh.  A hard-deadline timer thread guarantees the
+    cache is set (possibly empty) within 35 s regardless of what happens
+    inside _run_fetch — this is the ultimate escape hatch from warming:true.
+    """
     print("[startup] Pre-fetching feeds in background…")
+
+    def _backstop():
+        if _get_cache("items") is None:
+            print("[startup] Backstop: warm-up exceeded 35 s — setting empty cache")
+            _set_cache("items", [])
+
+    backstop = threading.Timer(35.0, _backstop)
+    backstop.daemon = True
+    backstop.start()
+
     try:
-        results = fetch_all()
+        results = _run_fetch()
+        _set_cache("items", results)
+        backstop.cancel()
+        print(f"[startup] Warm-up complete: {len(results)} items")
         if not results:
-            # Got 0 items — could be a transient network hiccup at boot.
-            # Clear the empty cache entry and try once more after a short pause.
-            print("[startup] Warm-up returned 0 items, retrying in 8 s…")
+            # Transient boot-time failure — retry once after a short pause
+            print("[startup] 0 items, retrying in 8 s…")
             time.sleep(8)
             with _cache_lock:
                 _cache.pop("items", None)
-            fetch_all()
+            results = _run_fetch()
+            _set_cache("items", results)
+            print(f"[startup] Retry complete: {len(results)} items")
     except Exception as exc:
+        _set_cache("items", [])
+        backstop.cancel()
         print(f"[startup] Warm-up failed: {exc}")
-    print("[startup] Cache warm-up complete.")
 
 threading.Thread(target=_warm_cache, daemon=True).start()
 
