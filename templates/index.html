@@ -460,6 +460,13 @@
       padding: 10px 12px 6px;
       flex-shrink: 0;
     }
+    .src-io-btn {
+      font-size: .67rem; font-weight: 600; color: var(--subtle);
+      background: none; border: 1px solid var(--border); border-radius: 4px;
+      padding: 2px 7px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      transition: all .15s;
+    }
+    .src-io-btn:hover { border-color: #94a3b8; color: var(--text); }
     .src-section-divider::before, .src-section-divider::after {
       content: ""; flex: 1; height: 1px; background: var(--border);
     }
@@ -676,7 +683,13 @@
         <div class="src-list" id="srcList"></div>
 
         <!-- ── Add Sources section ── -->
-        <div class="src-section-divider"><span class="src-section-label">Add Sources</span></div>
+        <div class="src-section-divider">
+          <span class="src-section-label">Add Sources</span>
+          <button class="src-io-btn" onclick="exportFeeds()" title="Download your custom sources as JSON">⬇ Export</button>
+          <label class="src-io-btn" title="Restore sources from a previously exported JSON file" style="cursor:pointer">
+            ⬆ Import<input type="file" accept=".json" style="display:none" onchange="importFeeds(this)">
+          </label>
+        </div>
 
         <div class="src-suggest-bar">
           <input type="text" id="suggestSearch" class="src-suggest-input"
@@ -1090,31 +1103,38 @@ function applyTypeAliases(feeds) {
   });
 }
 
+// Keep localStorage in sync as a backup after every change
+function syncLocalBackup() {
+  try { localStorage.setItem("pp_custom_feeds", JSON.stringify(customFeeds)); } catch (_) {}
+}
+
 async function loadCustomFeeds() {
+  const localFeeds = applyTypeAliases(
+    JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]")
+  );
   try {
     const resp = await fetch("/api/custom-feeds");
     const data = await resp.json();
-    if (data.feeds && data.feeds.length > 0) {
-      customFeeds = applyTypeAliases(data.feeds);
-      return;
-    }
-    // Server has no feeds yet — migrate from localStorage if present
-    const local = JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]");
-    if (local.length > 0) {
-      for (const f of local) {
-        await fetch("/api/custom-feeds", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(f),
-        });
-      }
-      customFeeds = applyTypeAliases(local);
-      localStorage.removeItem("pp_custom_feeds");
+    const serverFeeds = applyTypeAliases(data.feeds || []);
+
+    if (serverFeeds.length > 0) {
+      customFeeds = serverFeeds;
+    } else if (localFeeds.length > 0) {
+      // Server lost its data (e.g. redeploy wiped the file) — restore from backup
+      customFeeds = localFeeds;
+      fetch("/api/custom-feeds/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feeds: localFeeds }),
+      }).catch(() => {});
+      showToast(`Restored ${localFeeds.length} sources from local backup`, 4000);
     }
   } catch (e) {
-    // Fallback: use localStorage if server unreachable
-    customFeeds = applyTypeAliases(JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]"));
+    // Server unreachable — use local backup
+    customFeeds = localFeeds;
   }
+  // Always keep localStorage in sync (never delete it — it's our safety net)
+  syncLocalBackup();
 }
 
 function isAdded(url) {
@@ -1148,6 +1168,39 @@ function buildSuggestList() {
 
 function filterSuggestions() { buildSuggestList(); }
 
+function exportFeeds() {
+  const blob = new Blob([JSON.stringify(customFeeds, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `policypulse-sources-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function importFeeds(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const feeds = JSON.parse(text);
+    if (!Array.isArray(feeds)) throw new Error("Expected a JSON array");
+    const resp = await fetch("/api/custom-feeds/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feeds }),
+    });
+    const data = await resp.json();
+    showToast(`Imported ${data.imported} new sources (${data.total} total)`);
+    await loadCustomFeeds();
+    buildSuggestList();
+    mergeAndRefresh();
+    await fetchCustomItems();
+  } catch (e) {
+    showToast(`Import failed: ${e.message}`);
+  }
+  input.value = "";
+}
+
 // ── Re-label custom feeds ──────────────────────────────────────────
 function startRelabel(feedUrl, btn) {
   const row = btn.closest(".src-option");
@@ -1174,6 +1227,7 @@ async function commitRelabel(feedUrl, newType) {
   }).catch(() => {});
   const cf = customFeeds.find(f => f.url === feedUrl);
   if (cf) { cf.type = newType; cf.color = color; }
+  syncLocalBackup();
   // Update already-fetched items so badges reflect the new label immediately
   customItems = customItems.map(i =>
     i.org === cf?.name ? { ...i, org_type: newType, org_color: color } : i
@@ -1193,6 +1247,7 @@ async function addFeed(feed) {
     });
   } catch (e) { /* non-fatal — local state still updates */ }
   customFeeds.push(feed);
+  syncLocalBackup();
   showToast(`Adding "${feed.name}"…`);
   buildSuggestList();
   await fetchCustomItems();
@@ -1213,6 +1268,7 @@ function removeFeedByUrl(url) {
     body: JSON.stringify({ url }),
   }).catch(() => {});
   customFeeds = customFeeds.filter(f => f.url !== url);
+  syncLocalBackup();
   customItems = customItems.filter(i => i.org !== feed.name);
   // Also remove from activeSources so it doesn't orphan the filter
   activeSources.delete(feed.name);

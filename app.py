@@ -568,6 +568,32 @@ def api_remove_custom_feed():
     return jsonify({"ok": True})
 
 
+@app.route("/api/custom-feeds/bulk", methods=["POST"])
+def api_bulk_import_feeds():
+    """Bulk-import feeds (used for localStorage restore and manual import)."""
+    body = request.get_json(force=True, silent=True) or {}
+    incoming = body.get("feeds", [])
+    if not incoming:
+        return jsonify({"ok": True, "imported": 0})
+    with _custom_feeds_lock:
+        existing = _load_custom_feeds()
+        existing_urls = {f["url"] for f in existing}
+        added = 0
+        for feed in incoming:
+            url = feed.get("url", "").strip()
+            if url and url not in existing_urls:
+                existing.append({
+                    "name":  feed.get("name", url),
+                    "url":   url,
+                    "type":  feed.get("type", "Media"),
+                    "color": feed.get("color", "#4a5568"),
+                })
+                existing_urls.add(url)
+                added += 1
+        _save_custom_feeds(existing)
+    return jsonify({"ok": True, "imported": added, "total": len(existing)})
+
+
 @app.route("/api/custom-fetch", methods=["POST"])
 def api_custom_fetch():
     """Fetch items from caller-supplied feed configs (user-added sources)."""
