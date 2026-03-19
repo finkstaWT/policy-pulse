@@ -770,10 +770,16 @@ const CURATED = [
 
 // Map type → default badge color for newly probed feeds
 const TYPE_COLORS = {
-  "Think Tank":       "#1a3a5c", "Research":        "#154360", "Trade Org":   "#1d6a39",
-  "Trade Union":      "#7d6608", "Advocacy":        "#6c3483", "Government":  "#922b21",
-  "Media":            "#1a5276",
-  "Federal Government": "#5d4037", "State Government": "#1b5e20", "Legal":     "#4a148c",
+  "Think Tank":  "#1a3a5c", "Research":    "#154360", "Trade Org":   "#1d6a39",
+  "Trade Union": "#7d6608", "Advocacy":    "#6c3483", "Media":       "#1a5276",
+  "Fed Govt.":   "#5d4037", "Local Govt.": "#1b5e20", "Legal":       "#4a148c",
+};
+
+// Remap removed/renamed label types to their current equivalents
+const TYPE_ALIASES = {
+  "Government":         "Fed Govt.",
+  "Federal Government": "Fed Govt.",
+  "State Government":   "Local Govt.",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -1076,12 +1082,20 @@ document.addEventListener("click", e => {
 
 // Load custom feeds from the server. On first run, migrates any feeds that
 // were previously stored in localStorage so nothing is lost.
+function applyTypeAliases(feeds) {
+  return feeds.map(f => {
+    const canonical = TYPE_ALIASES[f.type];
+    if (!canonical) return f;
+    return { ...f, type: canonical, color: TYPE_COLORS[canonical] || f.color };
+  });
+}
+
 async function loadCustomFeeds() {
   try {
     const resp = await fetch("/api/custom-feeds");
     const data = await resp.json();
     if (data.feeds && data.feeds.length > 0) {
-      customFeeds = data.feeds;
+      customFeeds = applyTypeAliases(data.feeds);
       return;
     }
     // Server has no feeds yet — migrate from localStorage if present
@@ -1094,12 +1108,12 @@ async function loadCustomFeeds() {
           body: JSON.stringify(f),
         });
       }
-      customFeeds = local;
+      customFeeds = applyTypeAliases(local);
       localStorage.removeItem("pp_custom_feeds");
     }
   } catch (e) {
     // Fallback: use localStorage if server unreachable
-    customFeeds = JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]");
+    customFeeds = applyTypeAliases(JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]"));
   }
 }
 

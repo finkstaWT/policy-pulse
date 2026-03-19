@@ -28,11 +28,33 @@ _CUSTOM_FEEDS_FILE = DATA_DIR / "custom_feeds.json"
 _custom_feeds_lock = threading.Lock()
 
 
+_TYPE_ALIASES = {
+    "Government":          "Fed Govt.",
+    "Federal Government":  "Fed Govt.",
+    "State Government":    "Local Govt.",
+}
+_TYPE_COLORS = {
+    "Fed Govt.":   "#5d4037",
+    "Local Govt.": "#1b5e20",
+}
+
+
 def _load_custom_feeds() -> list:
     try:
         if _CUSTOM_FEEDS_FILE.exists():
             with open(_CUSTOM_FEEDS_FILE) as f:
-                return json.load(f)
+                feeds = json.load(f)
+            # Migrate removed/renamed label types
+            changed = False
+            for feed in feeds:
+                canonical = _TYPE_ALIASES.get(feed.get("type", ""))
+                if canonical:
+                    feed["type"]  = canonical
+                    feed["color"] = _TYPE_COLORS.get(canonical, feed.get("color", "#4a5568"))
+                    changed = True
+            if changed:
+                _save_custom_feeds(feeds)
+            return feeds
     except Exception as e:
         print(f"[warn] Could not read custom feeds: {e}")
     return []
