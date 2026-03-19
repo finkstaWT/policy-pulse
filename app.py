@@ -513,6 +513,26 @@ def api_add_custom_feed():
     return jsonify({"ok": True})
 
 
+@app.route("/api/custom-feeds", methods=["PATCH"])
+def api_update_custom_feed():
+    body = request.get_json(force=True, silent=True) or {}
+    url = body.get("url", "").strip()
+    if not url:
+        return jsonify({"ok": False, "error": "Missing URL"}), 400
+    with _custom_feeds_lock:
+        feeds = _load_custom_feeds()
+        for f in feeds:
+            if f["url"] == url:
+                if "name"  in body: f["name"]  = body["name"]
+                if "type"  in body: f["type"]  = body["type"]
+                if "color" in body: f["color"] = body["color"]
+                break
+        else:
+            return jsonify({"ok": False, "error": "Feed not found"}), 404
+        _save_custom_feeds(feeds)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/custom-feeds", methods=["DELETE"])
 def api_remove_custom_feed():
     body = request.get_json(force=True, silent=True) or {}

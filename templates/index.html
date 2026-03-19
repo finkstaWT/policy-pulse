@@ -440,6 +440,17 @@
     .src-option input[type=checkbox] { accent-color: var(--purple); cursor: pointer; flex-shrink: 0; }
     .src-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .src-name { font-size: .8rem; color: var(--text); flex: 1; }
+    .src-relabel-btn {
+      font-size: .72rem; color: var(--subtle); background: none; border: none;
+      cursor: pointer; padding: 1px 4px; border-radius: 3px; flex-shrink: 0;
+      opacity: 0; transition: opacity .15s;
+    }
+    .src-option:hover .src-relabel-btn { opacity: 1; }
+    .src-relabel-select {
+      font-size: .72rem; color: var(--text); border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 4px; background: #fff; cursor: pointer;
+      max-width: 120px; flex-shrink: 0;
+    }
 
     /* ── Discover / Add Sources section ─────────────────── */
     .src-section-divider {
@@ -759,9 +770,10 @@ const CURATED = [
 
 // Map type → default badge color for newly probed feeds
 const TYPE_COLORS = {
-  "Think Tank":  "#1a3a5c", "Research":   "#154360", "Trade Org":   "#1d6a39",
-  "Trade Union": "#7d6608", "Advocacy":   "#6c3483", "Government":  "#922b21",
-  "Media":       "#1a5276",
+  "Think Tank":       "#1a3a5c", "Research":        "#154360", "Trade Org":   "#1d6a39",
+  "Trade Union":      "#7d6608", "Advocacy":        "#6c3483", "Government":  "#922b21",
+  "Media":            "#1a5276",
+  "Federal Government": "#5d4037", "State Government": "#1b5e20", "Legal":     "#4a148c",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -988,14 +1000,21 @@ function buildSourceDropdown() {
 
   list.innerHTML = Object.keys(groups).sort().map(type => `
     <div class="src-group-label">${esc(type)}</div>
-    ${groups[type].map(s => `
-      <label class="src-option">
-        <input type="checkbox" checked data-src="${esc(s.name)}"
-               onchange="toggleSrc(this)">
-        <span class="src-dot" style="background:${esc(s.color)}"></span>
-        <span class="src-name">${esc(s.name)}</span>
-      </label>
-    `).join("")}
+    ${groups[type].map(s => {
+      const cf = customFeeds.find(f => f.name === s.name);
+      const relabelBtn = cf
+        ? `<button class="src-relabel-btn" title="Change label"
+             onclick="event.preventDefault();startRelabel('${esc(cf.url)}',this)">✎</button>`
+        : "";
+      return `
+        <label class="src-option">
+          <input type="checkbox" checked data-src="${esc(s.name)}"
+                 onchange="toggleSrc(this)">
+          <span class="src-dot" style="background:${esc(s.color)}"></span>
+          <span class="src-name">${esc(s.name)}</span>
+          ${relabelBtn}
+        </label>`;
+    }).join("")}
   `).join("");
 
   updateSrcBtn();
@@ -1104,6 +1123,41 @@ function buildSuggestList() {
 }
 
 function filterSuggestions() { buildSuggestList(); }
+
+// ── Re-label custom feeds ──────────────────────────────────────────
+function startRelabel(feedUrl, btn) {
+  const row = btn.closest(".src-option");
+  if (row.querySelector(".src-relabel-select")) return; // already open
+  const cf = customFeeds.find(f => f.url === feedUrl);
+  if (!cf) return;
+  const sel = document.createElement("select");
+  sel.className = "src-relabel-select";
+  sel.innerHTML = Object.keys(TYPE_COLORS)
+    .map(t => `<option${t === cf.type ? " selected" : ""}>${esc(t)}</option>`)
+    .join("");
+  sel.addEventListener("change", () => commitRelabel(feedUrl, sel.value));
+  sel.addEventListener("blur",   () => sel.remove());
+  btn.after(sel);
+  sel.focus();
+}
+
+async function commitRelabel(feedUrl, newType) {
+  const color = TYPE_COLORS[newType] || "#4a5568";
+  fetch("/api/custom-feeds", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: feedUrl, type: newType, color }),
+  }).catch(() => {});
+  const cf = customFeeds.find(f => f.url === feedUrl);
+  if (cf) { cf.type = newType; cf.color = color; }
+  // Update already-fetched items so badges reflect the new label immediately
+  customItems = customItems.map(i =>
+    i.org === cf?.name ? { ...i, org_type: newType, org_color: color } : i
+  );
+  mergeAndRefresh();
+  buildSourceDropdown();
+  showToast(`Relabeled as "${newType}"`);
+}
 
 async function addFeed(feed) {
   if (isAdded(feed.url)) return;
