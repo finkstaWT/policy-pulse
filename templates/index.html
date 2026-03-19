@@ -869,7 +869,7 @@ function mergeAndRefresh() {
   // Rebuild org types
   orgTypes = [...new Set(allItems.map(i => i.org_type))].sort();
 
-  // Rebuild sources list
+  // Rebuild sources list (items first, then any custom feeds with no items yet)
   const seenSrc = new Set();
   const prevActive = new Set(activeSources);  // keep existing selections
   allSources = [];
@@ -881,6 +881,13 @@ function mergeAndRefresh() {
         allSources.push({ name: i.org, color: i.org_color, type: i.org_type });
       }
     });
+  // Ensure custom feeds always appear even if they have no fetched items yet
+  customFeeds.forEach(cf => {
+    if (!seenSrc.has(cf.name)) {
+      seenSrc.add(cf.name);
+      allSources.push({ name: cf.name, color: cf.color, type: cf.type });
+    }
+  });
 
   // New sources start active; previously deselected sources stay deselected
   activeSources = new Set(
