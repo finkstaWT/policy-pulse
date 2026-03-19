@@ -19,6 +19,34 @@ BASE_DIR = Path(__file__).parent
 with open(BASE_DIR / "feeds.json") as f:
     FEED_CONFIG = json.load(f)
 
+# ── Server-side custom feeds storage ──────────────────────────────────────────
+# Stored in DATA_DIR/custom_feeds.json so feeds survive server restarts.
+# Set DATA_DIR env var to a Railway Volume mount path for full persistence
+# across redeployments.
+DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR))
+_CUSTOM_FEEDS_FILE = DATA_DIR / "custom_feeds.json"
+_custom_feeds_lock = threading.Lock()
+
+
+def _load_custom_feeds() -> list:
+    try:
+        if _CUSTOM_FEEDS_FILE.exists():
+            with open(_CUSTOM_FEEDS_FILE) as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"[warn] Could not read custom feeds: {e}")
+    return []
+
+
+def _save_custom_feeds(feeds: list) -> None:
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_CUSTOM_FEEDS_FILE, "w") as f:
+            json.dump(feeds, f, indent=2)
+    except Exception as e:
+        print(f"[warn] Could not save custom feeds: {e}")
+
+
 # ── Simple in-memory cache (30 min TTL) ───────────────────────────────────────
 _cache: dict = {}
 _cache_lock = threading.Lock()
@@ -456,6 +484,46 @@ def api_discover_feeds():
             results.append(gnews_res)
 
     return jsonify({"feeds": results[:6]})
+
+
+@app.route("/api/custom-feeds", methods=["GET"])
+def api_get_custom_feeds():
+    with _custom_feeds_lock:
+        feeds = _load_custom_feeds()
+    return jsonify({"feeds": feeds})
+
+
+@app.route("/api/custom-feeds", methods=["POST"])
+def api_add_custom_feed():
+    feed = request.get_json(force=True, silent=True) or {}
+    url = feed.get("url", "").strip()
+    if not url:
+        return jsonify({"ok": False, "error": "Missing URL"}), 400
+    with _custom_feeds_lock:
+        feeds = _load_custom_feeds()
+        if any(f["url"] == url for f in feeds):
+            return jsonify({"ok": True, "duplicate": True})
+        feeds.append({
+            "name":  feed.get("name", url),
+            "url":   url,
+            "type":  feed.get("type", "Media"),
+            "color": feed.get("color", "#4a5568"),
+        })
+        _save_custom_feeds(feeds)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/custom-feeds", methods=["DELETE"])
+def api_remove_custom_feed():
+    body = request.get_json(force=True, silent=True) or {}
+    url = body.get("url", "").strip()
+    if not url:
+        return jsonify({"ok": False, "error": "Missing URL"}), 400
+    with _custom_feeds_lock:
+        feeds = _load_custom_feeds()
+        feeds = [f for f in feeds if f["url"] != url]
+        _save_custom_feeds(feeds)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/custom-fetch", methods=["POST"])

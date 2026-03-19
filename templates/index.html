@@ -742,7 +742,7 @@ let bookmarksOnly = false;
 let searchQ       = "";
 let currentView   = "grid";
 let bookmarks     = new Set(JSON.parse(localStorage.getItem("pp_bm") || "[]"));
-let customFeeds   = JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]");
+let customFeeds   = [];   // loaded from server on startup; see loadCustomFeeds()
 
 // Curated suggestions (verified working feeds not in the default set)
 const CURATED = [
@@ -827,7 +827,9 @@ async function loadItems(forceRefresh = false) {
 
     processData(data);
 
-    // Silently fetch any user-added custom feeds and merge
+    // Load custom feeds from server (migrates localStorage on first run)
+    await loadCustomFeeds();
+    buildSuggestList();
     if (customFeeds.length > 0) {
       await fetchCustomItems();
     }
@@ -1042,8 +1044,34 @@ document.addEventListener("click", e => {
 });
 
 // ── Discover / Add Sources ──────────────────────────────────────────
-function saveCustomFeeds() {
-  localStorage.setItem("pp_custom_feeds", JSON.stringify(customFeeds));
+
+// Load custom feeds from the server. On first run, migrates any feeds that
+// were previously stored in localStorage so nothing is lost.
+async function loadCustomFeeds() {
+  try {
+    const resp = await fetch("/api/custom-feeds");
+    const data = await resp.json();
+    if (data.feeds && data.feeds.length > 0) {
+      customFeeds = data.feeds;
+      return;
+    }
+    // Server has no feeds yet — migrate from localStorage if present
+    const local = JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]");
+    if (local.length > 0) {
+      for (const f of local) {
+        await fetch("/api/custom-feeds", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(f),
+        });
+      }
+      customFeeds = local;
+      localStorage.removeItem("pp_custom_feeds");
+    }
+  } catch (e) {
+    // Fallback: use localStorage if server unreachable
+    customFeeds = JSON.parse(localStorage.getItem("pp_custom_feeds") || "[]");
+  }
 }
 
 function isAdded(url) {
@@ -1079,8 +1107,14 @@ function filterSuggestions() { buildSuggestList(); }
 
 async function addFeed(feed) {
   if (isAdded(feed.url)) return;
+  try {
+    await fetch("/api/custom-feeds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(feed),
+    });
+  } catch (e) { /* non-fatal — local state still updates */ }
   customFeeds.push(feed);
-  saveCustomFeeds();
   showToast(`Adding "${feed.name}"…`);
   buildSuggestList();
   await fetchCustomItems();
@@ -1095,8 +1129,12 @@ function addSuggestion(url) {
 function removeFeedByUrl(url) {
   const feed = customFeeds.find(f => f.url === url);
   if (!feed) return;
+  fetch("/api/custom-feeds", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  }).catch(() => {});
   customFeeds = customFeeds.filter(f => f.url !== url);
-  saveCustomFeeds();
   customItems = customItems.filter(i => i.org !== feed.name);
   // Also remove from activeSources so it doesn't orphan the filter
   activeSources.delete(feed.name);
