@@ -895,8 +895,9 @@ function mergeAndRefresh() {
   );
   if (activeSources.size === 0) activeSources = new Set(allSources.map(s => s.name));
 
-  // New org types start active
-  orgTypes.forEach(t => activeTypes.add(t));
+  // All known types (from items + any custom feed types) start active
+  const allKnownTypes = new Set([...orgTypes, ...Object.keys(TYPE_COLORS)]);
+  allKnownTypes.forEach(t => activeTypes.add(t));
 
   buildOrgFilters();
   buildSourceDropdown();
@@ -936,7 +937,9 @@ function buildOrgFilters() {
   // remove old pills (keep the label)
   group.querySelectorAll(".pill").forEach(p => p.remove());
 
-  orgTypes.forEach(t => {
+  // Show all known types: those present in items + all defined TYPE_COLORS
+  const allKnownTypes = [...new Set([...orgTypes, ...Object.keys(TYPE_COLORS)])].sort();
+  allKnownTypes.forEach(t => {
     const btn = document.createElement("button");
     btn.className = "pill on tag-type";
     btn.dataset.orgType = t;
